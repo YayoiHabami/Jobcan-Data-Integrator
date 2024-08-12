@@ -1,0 +1,12 @@
+# Python env
+venv/
+__pycache__/
+
+# Experiments
+experiments/
+
+# Data
+*.db
+*.log
+*.csv
+*.json
