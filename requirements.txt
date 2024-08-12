@@ -1,3 +1,8 @@
+# Data Integrator
+requests
+winsdk
+win11toast
+
 # Config Editor
 
 # Test (If you want to run the tests)
