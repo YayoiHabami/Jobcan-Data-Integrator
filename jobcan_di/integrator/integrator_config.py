@@ -128,7 +128,7 @@ class JobcanDIConfig:
         - 1 ("INFO"): INFO以上通知（すべて通知）
         - 2 ("WARNING"): 警告以上通知
         - 3 ("ERROR"): エラーのみ通知
-        """ # TODO: LogLevelの値の差異を修正
+        """
 
         self.logging_to_console = _c['DEBUGGING']['LOG_TO_CONSOLE'].value
         """ログ出力をコンソールにも行うか"""

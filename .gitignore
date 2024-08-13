@@ -10,3 +10,7 @@ experiments/
 *.log
 *.csv
 *.json
+
+# Build (nuitka)
+*.build/
+*.dist/
