@@ -1,0 +1,38 @@
+全体:
+    ☐ `/v1/projects/`API関連の実装
+        ☐ プログラムの作成
+        ☐ `データベース構造.md`の更新
+    ☐ `/v1/company/`API関連の実装
+        ☐ プログラムの作成
+        ☐ `データベース構造.md`の更新
+
+DB構造(いずれも変更時は`データベース構造.md`を編集のこと):
+    ☐ `users`テーブルの主キーを`user_code`に変更する
+    ☐ `requests`の各大テーブルの項目の説明を追加する
+        ☐ `customized_items`
+        ☐ `expense`
+        ☐ `payment`
+        ☐ `ec`
+        ☐ `approval_process`
+        ☐ `viewers`
+
+integrator:
+    ☐ `config.ini`が削除されても復帰可能なように、データを保持するソースとかを追加する
+    app_statusの追加:
+        ☐ app_statusを追加する
+        ☐ app_statusで読込先config.iniが指定された場合はそちらを優先して読み込むようにする
+    ☐ `ThrottledRequest`で`request.exceptions.ReadTimeout`が発生した場合の処理を追加する（キャッチ）
+    データ取得:
+        ☐ 更新中にcountが増えた場合の処理
+        ☐ `null`になりえる全データについて、それがなくなった場合の処理
+        ☐ 差分更新の実装
+        ☐ 申請書データ(概要)の取得に際して、`form_id`の時期条件を設定可能にする
+    データ管理:
+        ☐ データが減少した場合の処理
+
+ConfigEditorGUI:
+    ☐ タイトル・トップページの作成
+    ☐ 一度作成したWidgetをdestroyせず、`.remove`などしてリストに格納するなど
+    ☐ `ConfigVariableFrame`のフォントを日本語に対応させる⇒`ConfigEditorGuiFonts`クラスを作成
+    ☐ コンフィグを新たに開く`open`ボタンなどの実装
+    ☐ `ENABLE_PROGRESS_TOAST`コンフィグの追加 (本体にGUIを追加した場合は内部的にFalseにする)
