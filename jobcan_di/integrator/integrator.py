@@ -43,7 +43,6 @@ with JobcanDataIntegrator(config) as di:
     di.run()
 ```
 """
-from enum import Enum
 import datetime
 import os
 import sqlite3
@@ -62,6 +61,7 @@ from ._json_data_io import save_response_to_json
 from . import progress_status as ps
 from .progress_status import (
     ProgressStatus,
+    DetailedProgressStatus,
     InitializingStatus,
     GetBasicDataStatus,
     GetFormOutlineStatus,
@@ -89,6 +89,15 @@ class JobcanDataIntegrator:
         ----------
         config : Optional[JobcanDIConfig], default None
             コンフィグ、読み込むconfig.iniを変更したい場合はここから指定
+
+        Attributes
+        ----------
+        app_id : str
+            アプリケーションID
+        progress_outline : ProgressStatus
+            進捗状況の概要
+        progress_detail : Optional[DetailedProgressStatus]
+            進捗状況の詳細、InitializingStatusなど
         """
         self.config = JobcanDIConfig(os.getcwd()) if config is None else config
 
@@ -99,9 +108,15 @@ class JobcanDataIntegrator:
         self._request = ThrottledRequests(self.config.requests_per_sec)
         self._conn = None
         self._notification_data = None
+        """トースト通知のデータ (トースト通知の更新に使用)"""
         self._notifier = None
+        """トースト通知の管理クラス (トースト通知の更新に使用)"""
         self._completed = False
         """全ての処理が完了したかどうか、中断された場合もFalse"""
+        self.progress_outline: ProgressStatus = ProgressStatus.INITIALIZING
+        """進捗状況の概要"""
+        self.progress_detail: Optional[DetailedProgressStatus] = None
+        """進捗状況の詳細、InitializingStatusなど"""
         self._tmp_io = JobcanTempFileIO(os.getcwd())
 
         # 初期化処理
@@ -168,6 +183,10 @@ class JobcanDataIntegrator:
             duration='short',
             suppress_popup=True # 通知センターにのみ表示
         )
+        # NotificationDataとNotifierの初期化
+        self._notification_data = NotificationData()
+        self._notifier = ToastNotificationManager.create_toast_notifier(self.app_id)
+
         # 進捗状況の更新
         self.update_progress(ProgressStatus.INITIALIZING,
                              InitializingStatus.INIT_NOTIFICATION, 1, 1)
@@ -319,7 +338,8 @@ class JobcanDataIntegrator:
                    group=level.name,
                    icon=self.config.app_icon_png_path[level],)
 
-    def update_progress(self, status:ProgressStatus, sub_status:Enum,
+    def update_progress(self, status:ProgressStatus,
+                        sub_status:DetailedProgressStatus,
                         current:int, total:Union[int,None],
                         sub_count:int=0, sub_total_count:int=0):
         """進捗状況を更新する
@@ -328,7 +348,7 @@ class JobcanDataIntegrator:
         ----------
         status : ProgressStatus
             大枠の進捗状況
-        sub_status : Enum
+        sub_status : DetailedProgressStatus
             細かい進捗状況、InitializingStatusなど
         current : int
             現在の進捗
@@ -342,6 +362,14 @@ class JobcanDataIntegrator:
             第2段階進捗の全体数に可算する値、基本的には0
             ProgressStatus.FORM_OUTLINEの場合に使用
         """
+        # 自身の進捗状況を更新
+        self.progress_outline = status
+        self.progress_detail = sub_status
+
+        # Notifier が未初期化の場合は何もしない (._init_progress_notification()の呼び出し前)
+        if self._notifier is None:
+            return
+
         # sub_statusのメッセージを取得
         status_msg = ps.get_progress_status_msg(status, sub_status, sub_count, sub_total_count)
         if total is None:
@@ -353,11 +381,6 @@ class JobcanDataIntegrator:
         else:
             value = current / total
             str_value = f"{current}/{total}"
-
-        # NotificationDataとNotifierの初期化
-        if self._notifier is None:
-            self._notification_data = NotificationData()
-            self._notifier = ToastNotificationManager.create_toast_notifier(self.app_id)
 
         self._notification_data.values['title'] = ps.PROGRESS_STATUS_MSG[status]
         self._notification_data.values['status'] = status_msg
@@ -606,7 +629,8 @@ class JobcanDataIntegrator:
                 'success': form_outline_data['success'],
                 'ids': [res['id'] for res in form_outline_data['results']]
             }
-        self._tmp_io.save_form_outline(tmp_data)
+            # NOTE: 新規記録対象が10000件程度でも保存にかかる時間は0.1s程度のため、毎回直接保存する
+            self._tmp_io.save_form_outline(tmp_data)
 
         return succeeded
 

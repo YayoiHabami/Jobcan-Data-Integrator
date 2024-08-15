@@ -35,6 +35,34 @@ integrator:
         ☐ 申請書データ(概要)の取得に際して、`form_id`の時期条件を設定可能にする
     データ管理:
         ☐ データが減少した場合の処理
+    進捗管理:
+        例外処理:
+            ☐ (以降の処理を行わない)致命的なエラーが発生した場合に、`._is_canceled`を`True`にする
+            ☐ 各処理の冒頭に、`._is_canceled`が`True`になっていないかの判定を追加する
+            ☐ ディレクトリ作成時に、指定されたディレクトリへのアクセス権がない場合の処理を追加
+            ☐ トークン認証失敗時に、`sys.exit`を投げないようにする (`._init_token`)
+            ☐ 同上 (`.update_token) ⇒ `bool`を返すようにし、それを受け取った側で処理を行う
+            ☐ DB接続失敗時に、`sys.exit`を投げないようにする (`._init_connection`)
+            ☐ テーブルを正常に作成できているかの確認を追加 (`._init_tables`)
+        完了時処理:
+            ☐ `JobcanDataIntegrator.update_progress`について、`ProgressStatus.COMPLETED`である場合の処理を追加 (他の値の`None`を許容)
+        BASIC_DATA:
+            ☐ users取得に失敗した場合、その旨をapp_statusに記録する
+            ☐ usersの保存に失敗した場合、失敗した要素の`user_code`などを併せてapp_statusに記録する
+            ☐ groupsの取得に失敗した場合、その旨をapp_statusに記録する
+            ☐ groupsの保存に失敗した場合、失敗した要素の`group_code`などを併せてapp_statusに記録する
+            ☐ positionsの取得に失敗した場合、その旨をapp_statusに記録する
+            ☐ positionsの保存に失敗した場合、失敗した要素の`position_code`などを併せてapp_statusに記録する
+        FORM_OUTLINE:
+            ☐ form取得に失敗した場合、その旨をapp_statusに記録する
+            ☐ formの保存に失敗した場合、失敗した要素の`form_id`などを併せてapp_statusに記録する
+            ☐ 各formの更新要素の取得に失敗した場合、その旨をapp_statusに記録する
+        FORM_DETAIL:
+            ☐ 申請書のステータスが`canceled_after_completion`,`completed`,`in_progress`,`returned`,`rejected`の5つのみであるかを確認
+            ☐ 読込対象として、一時ファイルのIDだけでなく`requests`テーブルの継続中のIDも取得する
+            ☐ 各申請書の取得に失敗した場合、その旨をapp_statusに記録する
+            ☐ 各申請書の保存に失敗した場合、失敗した要素の`request_id`などを併せてapp_statusに記録する
+            ☐ `._update_form_detail`の最後まで進んだらapp_statusの最終更新日時を更新
 
 ConfigEditorGUI:
     ☐ タイトル・トップページの作成

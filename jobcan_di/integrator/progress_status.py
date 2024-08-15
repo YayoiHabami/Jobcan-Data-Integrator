@@ -10,10 +10,12 @@ Functions
 Classes
 -------
 - `ProgressStatus`: 進捗状況 (大枠)
+- `DetailedProgressStatus`: 進捗状況 (詳細、継承用)
 - `InitializingStatus`: 進捗状況 (ProgressStatus.INITIALIZING)
 - `GetBasicDataStatus`: 進捗状況 (ProgressStatus.BASIC_DATA)
 - `GetFormOutlineStatus`: 進捗状況 (ProgressStatus.FORM_OUTLINE)
 - `GetFormDetailStatus`: 進捗状況 (ProgressStatus.FORM_DETAIL)
+- `TerminatingStatus`: 進捗状況 (ProgressStatus.TERMINATING)
 - `APIType`: APIの種類
 
 Constants
@@ -24,6 +26,7 @@ Constants
 - `GET_BASIC_DATA_STATUS_MSG`: 進捗状況 (BASIC_DATA) メッセージ
 - `GET_FORM_OUTLINE_STATUS_MSG`: 進捗状況 (FORM_OUTLINE) メッセージ
 - `GET_FORM_DETAIL_STATUS_MSG`: 進捗状況 (FORM_DETAIL) メッセージ
+- `TERMINATING_STATUS_MSG`: 進捗状況 (TERMINATING) メッセージ
 - `API_TYPE_NAME`: APIの種類の名前
 """
 from enum import Enum, auto
@@ -45,8 +48,8 @@ class ProgressStatus(Enum):
     FORM_OUTLINE = auto()
     # 申請書データ (詳細) の取得
     FORM_DETAIL = auto()
-    # データの取得完了
-    COMPLETED = auto()
+    # 終了処理
+    TERMINATING = auto()
     # データの取得失敗
     FAILED = -1
 MAX_STATUS_LENGTH = max([len(s.name) for s in ProgressStatus])
@@ -58,11 +61,23 @@ PROGRESS_STATUS_MSG = {
     ProgressStatus.BASIC_DATA: f"基本データ取得中... (STEP 2/{_cnt})",
     ProgressStatus.FORM_OUTLINE: f"申請書データ (概要) 取得中... (STEP 3/{_cnt})",
     ProgressStatus.FORM_DETAIL: f"申請書データ (詳細) 取得中... (STEP 4/{_cnt})",
-    ProgressStatus.COMPLETED: f"更新完了！ (STEP {_cnt}/{_cnt})",
+    ProgressStatus.TERMINATING: f"終了処理中... (STEP 5/{_cnt})",
     ProgressStatus.FAILED: "更新に失敗しました"
 }
 
-class InitializingStatus(Enum):
+class DetailedProgressStatus(Enum):
+    """進捗状況 (詳細)
+
+    Notes
+    -----
+    - 以下のEnumクラスで継承して使用
+      - InitializingStatus
+      - GetBasicDataStatus
+      - GetFormOutlineStatus
+      - GetFormDetailStatus
+      - TerminatingStatus"""
+
+class InitializingStatus(DetailedProgressStatus):
     """進捗状況 (ProgressStatus.INITIALIZING)"""
     LOADING_CONFIG = 1
     INIT_LOGGER = auto()
@@ -84,7 +99,7 @@ INITIALIZING_STATUS_MSG = {
     InitializingStatus.INIT_DB_TABLES: f"データベースのテーブルを初期化中... (7/{_cnt})",
 }
 
-class GetBasicDataStatus(Enum):
+class GetBasicDataStatus(DetailedProgressStatus):
     """進捗状況 (ProgressStatus.BASIC_DATA)"""
     GET_USER = 1
     GET_GROUP = auto()
@@ -98,20 +113,18 @@ GET_BASIC_DATA_STATUS_MSG = {
     GetBasicDataStatus.GET_POSITION: f"役職データを取得中... (3/{_cnt})",
 }
 
-class GetFormOutlineStatus(Enum):
+class GetFormOutlineStatus(DetailedProgressStatus):
     """進捗状況 (ProgressStatus.FORM_OUTLINE)"""
     GET_FORM_INFO = 1
     GET_OUTLINE = auto()
-    SAVE_TO_TMP = auto()
 
 # 進捗状況 (FORM_OUTLINE) メッセージ
 GET_FORM_OUTLINE_STATUS_MSG = {
     GetFormOutlineStatus.GET_FORM_INFO: "申請書様式データを取得中... ({}/{})",
     GetFormOutlineStatus.GET_OUTLINE: "申請書データ（概要）取得中... ({}/{})",
-    GetFormOutlineStatus.SAVE_TO_TMP: "一時ファイルにデータを保存中... ({}/{})",
 }
 
-class GetFormDetailStatus(Enum):
+class GetFormDetailStatus(DetailedProgressStatus):
     """進捗状況 (ProgressStatus.FORM_DETAIL)"""
     SEEK_TARGET = 1     # 取得対象の申請書を探す
     GET_DETAIL = auto() # APIで申請書データ（詳細）を取得＆保存
@@ -123,8 +136,22 @@ GET_FORM_DETAIL_STATUS_MSG = {
     GetFormDetailStatus.GET_DETAIL: "申請書データ（詳細）取得中... ({}/{})",
 }
 
+class TerminatingStatus(DetailedProgressStatus):
+    """進捗状況 (ProgressStatus.TERMINATING)"""
+    CLOSE_DB_CONNECTION = 1
+    DELETE_TEMP_FILES = auto()
+    COMPLETED = auto()
+
+# 進捗状況 (TERMINATING) メッセージ
+_cnt = len(TerminatingStatus)
+TERMINATING_STATUS_MSG = {
+    TerminatingStatus.CLOSE_DB_CONNECTION: f"データベースとの接続を終了中... (1/{_cnt})",
+    TerminatingStatus.DELETE_TEMP_FILES: f"一時ファイルを削除中... (2/{_cnt})",
+    TerminatingStatus.COMPLETED: f"すべての処理が完了しました (3/{_cnt})",
+}
+
 # ProgressStatusと各進捗状況に対応するメッセージを取得
-def get_progress_status_msg(status:ProgressStatus, sub_status:Enum,
+def get_progress_status_msg(status:ProgressStatus, sub_status:DetailedProgressStatus,
                             sub_count: int = 0, sub_total_count : int = 0) -> str:
     """ProgressStatusと各進捗状況に対応するメッセージを取得する
 
@@ -132,7 +159,7 @@ def get_progress_status_msg(status:ProgressStatus, sub_status:Enum,
     ----------
     status : ProgressStatus
         大枠の進捗状況
-    sub_status : Enum
+    sub_status : DetailedProgressStatus
         細かい進捗状況
     sub_count : int, default 0
         進捗に可算する値, ProgressStatus.FORM_OUTLINEの場合に使用
@@ -152,6 +179,8 @@ def get_progress_status_msg(status:ProgressStatus, sub_status:Enum,
                 sub_count + sub_status.value,
                 sub_total_count+len(GetFormDetailStatus)
             )
+    elif status == ProgressStatus.TERMINATING:
+        return TERMINATING_STATUS_MSG[sub_status]
     return ""
 
 
