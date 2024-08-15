@@ -102,13 +102,11 @@ class GetFormOutlineStatus(Enum):
     """進捗状況 (ProgressStatus.FORM_OUTLINE)"""
     GET_FORM_INFO = 1
     GET_OUTLINE = auto()
-    SAVE_TO_TMP = auto()
 
 # 進捗状況 (FORM_OUTLINE) メッセージ
 GET_FORM_OUTLINE_STATUS_MSG = {
     GetFormOutlineStatus.GET_FORM_INFO: "申請書様式データを取得中... ({}/{})",
     GetFormOutlineStatus.GET_OUTLINE: "申請書データ（概要）取得中... ({}/{})",
-    GetFormOutlineStatus.SAVE_TO_TMP: "一時ファイルにデータを保存中... ({}/{})",
 }
 
 class GetFormDetailStatus(Enum):

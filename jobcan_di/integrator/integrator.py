@@ -606,7 +606,8 @@ class JobcanDataIntegrator:
                 'success': form_outline_data['success'],
                 'ids': [res['id'] for res in form_outline_data['results']]
             }
-        self._tmp_io.save_form_outline(tmp_data)
+            # NOTE: 新規記録対象が10000件程度でも保存にかかる時間は0.1s程度のため、毎回直接保存する
+            self._tmp_io.save_form_outline(tmp_data)
 
         return succeeded
 
