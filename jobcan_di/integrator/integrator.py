@@ -43,7 +43,6 @@ with JobcanDataIntegrator(config) as di:
     di.run()
 ```
 """
-from enum import Enum
 import datetime
 import os
 import sqlite3
@@ -62,6 +61,7 @@ from ._json_data_io import save_response_to_json
 from . import progress_status as ps
 from .progress_status import (
     ProgressStatus,
+    DetailedProgressStatus,
     InitializingStatus,
     GetBasicDataStatus,
     GetFormOutlineStatus,
@@ -319,7 +319,8 @@ class JobcanDataIntegrator:
                    group=level.name,
                    icon=self.config.app_icon_png_path[level],)
 
-    def update_progress(self, status:ProgressStatus, sub_status:Enum,
+    def update_progress(self, status:ProgressStatus,
+                        sub_status:DetailedProgressStatus,
                         current:int, total:Union[int,None],
                         sub_count:int=0, sub_total_count:int=0):
         """進捗状況を更新する
@@ -328,7 +329,7 @@ class JobcanDataIntegrator:
         ----------
         status : ProgressStatus
             大枠の進捗状況
-        sub_status : Enum
+        sub_status : DetailedProgressStatus
             細かい進捗状況、InitializingStatusなど
         current : int
             現在の進捗
