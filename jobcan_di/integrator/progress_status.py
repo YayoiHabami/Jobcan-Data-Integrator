@@ -16,6 +16,7 @@ Classes
 - `GetFormOutlineStatus`: 進捗状況 (ProgressStatus.FORM_OUTLINE)
 - `GetFormDetailStatus`: 進捗状況 (ProgressStatus.FORM_DETAIL)
 - `TerminatingStatus`: 進捗状況 (ProgressStatus.TERMINATING)
+- `ErrorStatus`: エラー
 - `APIType`: APIの種類
 
 Constants
@@ -86,6 +87,7 @@ class InitializingStatus(DetailedProgressStatus):
     INIT_TOKEN = auto()
     INIT_DB_CONNECTION = auto()
     INIT_DB_TABLES = auto()
+    COMPLETED = auto()
 
 # 進捗状況 (IN_PROGRESS) メッセージ
 _cnt = len(InitializingStatus)
@@ -97,6 +99,7 @@ INITIALIZING_STATUS_MSG = {
     InitializingStatus.INIT_TOKEN: f"APIトークンを初期化中... (5/{_cnt})",
     InitializingStatus.INIT_DB_CONNECTION: f"データベースとの接続を初期化中... (6/{_cnt})",
     InitializingStatus.INIT_DB_TABLES: f"データベースのテーブルを初期化中... (7/{_cnt})",
+    InitializingStatus.COMPLETED: f"初期化が完了しました (8/{_cnt})"
 }
 
 class GetBasicDataStatus(DetailedProgressStatus):
@@ -150,6 +153,33 @@ TERMINATING_STATUS_MSG = {
     TerminatingStatus.COMPLETED: f"すべての処理が完了しました (3/{_cnt})",
 }
 
+class ErrorStatus(DetailedProgressStatus):
+    """エラー"""
+    # トークン
+    TOKEN_MISSING_ENV_EMPTY = auto()
+    """トークンが指定されず、指定された環境変数が空の場合"""
+    TOKEN_MISSING_ENV_NOT_FOUND = auto()
+    """トークンが指定されず、指定された環境変数が存在しない場合"""
+    TOKEN_INVALID = auto()
+    """トークンが不正な場合"""
+    # データベース
+    DATABASE_CONNECTION_FAILED = auto()
+    """データベースへの接続に失敗した場合"""
+    # API
+    API_INVALID_PARAMETER = auto()
+    """APIのパラメータが不正な場合 (Status code: 400, code: 400003)"""
+    API_INVALID_JSON_FORMAT = auto()
+    """リクエストのJSONの形式が不正な場合 (Status code: 400, code: 400100)"""
+    API_COMMON_ID_SYNC_FAILED = auto()
+    """共通IDとの連携に失敗した場合 (Status code: 400, code: 400900)"""
+    API_DATA_NOT_FOUND = auto()
+    """対象のデータが見つからない場合 (Status code: 404)"""
+    API_UNEXPECTED_ERROR = auto()
+    """予期しないエラーが発生した場合 (Status code: 500)"""
+    # その他
+    UNKNOWN_ERROR = auto()
+    """未知のエラーが発生した場合"""
+
 # ProgressStatusと各進捗状況に対応するメッセージを取得
 def get_progress_status_msg(status:ProgressStatus, sub_status:DetailedProgressStatus,
                             sub_count: int = 0, sub_total_count : int = 0) -> str:
@@ -160,7 +190,7 @@ def get_progress_status_msg(status:ProgressStatus, sub_status:DetailedProgressSt
     status : ProgressStatus
         大枠の進捗状況
     sub_status : DetailedProgressStatus
-        細かい進捗状況
+        細かい進捗状況、ErrorStatusを除く
     sub_count : int, default 0
         進捗に可算する値, ProgressStatus.FORM_OUTLINEの場合に使用
     sub_total_count : int, default 0
@@ -181,6 +211,8 @@ def get_progress_status_msg(status:ProgressStatus, sub_status:DetailedProgressSt
             )
     elif status == ProgressStatus.TERMINATING:
         return TERMINATING_STATUS_MSG[sub_status]
+    elif status == ProgressStatus.FAILED:
+        return "更新に失敗しました"
     return ""
 
 
