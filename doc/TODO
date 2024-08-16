@@ -39,7 +39,7 @@ integrator:
             ☐ DB接続失敗時に、`sys.exit`を投げないようにする (`._init_connection`)
             ☐ テーブルを正常に作成できているかの確認を追加 (`._init_tables`)
         完了時処理:
-            ☐ `JobcanDataIntegrator.update_progress`について、`ProgressStatus.COMPLETED`である場合の処理を追加 (他の値の`None`を許容)
+            ✔ `JobcanDataIntegrator.update_progress`について、`ProgressStatus.TERMINATING`である場合の処理を追加 (他の値の`None`を許容) @done(24-08-16 16:05)
         BASIC_DATA:
             ☐ users取得に失敗した場合、その旨をapp_statusに記録する
             ☐ usersの保存に失敗した場合、失敗した要素の`user_code`などを併せてapp_statusに記録する

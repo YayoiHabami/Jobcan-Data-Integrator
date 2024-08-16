@@ -66,6 +66,7 @@ from .progress_status import (
     GetBasicDataStatus,
     GetFormOutlineStatus,
     GetFormDetailStatus,
+    TerminatingStatus,
     APIType
 )
 from ._tf_io import JobcanTempFileIO
@@ -112,6 +113,8 @@ class JobcanDataIntegrator:
         """進捗通知クラス"""
         self._completed = False
         """全ての処理が完了したかどうか、中断された場合もFalse"""
+        self._is_canceled = False
+        """致命的なエラーが発生し、以降の処理を行えなくなった場合はTrue"""
         self.progress_outline: ProgressStatus = ProgressStatus.INITIALIZING
         """進捗状況の概要"""
         self.progress_detail: Optional[DetailedProgressStatus] = None
@@ -167,6 +170,9 @@ class JobcanDataIntegrator:
                 +"デフォルトのログファイルを使用します: {self.config.default_log_path}",
                 LogLevel.WARNING
             )
+
+        self.update_progress(ProgressStatus.INITIALIZING,
+                             InitializingStatus.INIT_LOGGER, 1, 1)
 
     def _init_progress_notification(self):
         """進捗に関するトースト通知の初期化"""
@@ -360,22 +366,28 @@ class JobcanDataIntegrator:
     def _run(self):
         """メイン処理"""
         # 基本データの取得
-        if not self._update_basic_data():
+        if (not self._is_canceled) and (not self._update_basic_data()):
             self._completed = False
             return
 
         # 申請書データ (概要) の取得
-        if not self._update_form_outline():
+        if (not self._is_canceled) and (not self._update_form_outline()):
             self._completed = False
             return
 
         # 申請書データ (詳細) の取得
-        if not self._update_form_detail():
+        if (not self._is_canceled) and (not self._update_form_detail()):
             self._completed = False
             return
 
         # 全処理が完了
-        self._completed = True
+        if not self._is_canceled:
+            self._completed = True
+            self.logger(ProgressStatus.TERMINATING,
+                        "全ての処理が完了しました",
+                        LogLevel.INFO)
+            self.update_progress(ProgressStatus.TERMINATING,
+                                 TerminatingStatus.COMPLETED, 1, 1)
 
     def run(self):
         """メイン処理を実行する
@@ -390,7 +402,6 @@ class JobcanDataIntegrator:
         # 本番用: エラーをキャッチしてアプリケーションの終了を防ぐ
         try:
             self._run()
-
         except Exception as e:
             self.logger(ProgressStatus.FAILED,
                         f"エラーが発生しました: {e}",
@@ -604,6 +615,8 @@ class JobcanDataIntegrator:
     def _update_form_detail(self) -> bool:
         """申請書データ (詳細) の取得＆更新"""
         # 一時ファイルの読み込み
+        self.update_progress(ProgressStatus.FORM_DETAIL,
+                             GetFormDetailStatus.SEEK_TARGET, 0, 1)
         request_ids = self._tmp_io.load_form_outline()
 
         for i, item in enumerate(request_ids.items()):
