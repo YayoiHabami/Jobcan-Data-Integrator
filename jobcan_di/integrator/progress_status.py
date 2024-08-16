@@ -87,6 +87,7 @@ class InitializingStatus(DetailedProgressStatus):
     INIT_TOKEN = auto()
     INIT_DB_CONNECTION = auto()
     INIT_DB_TABLES = auto()
+    COMPLETED = auto()
 
 # 進捗状況 (IN_PROGRESS) メッセージ
 _cnt = len(InitializingStatus)
@@ -98,6 +99,7 @@ INITIALIZING_STATUS_MSG = {
     InitializingStatus.INIT_TOKEN: f"APIトークンを初期化中... (5/{_cnt})",
     InitializingStatus.INIT_DB_CONNECTION: f"データベースとの接続を初期化中... (6/{_cnt})",
     InitializingStatus.INIT_DB_TABLES: f"データベースのテーブルを初期化中... (7/{_cnt})",
+    InitializingStatus.COMPLETED: f"初期化が完了しました (8/{_cnt})"
 }
 
 class GetBasicDataStatus(DetailedProgressStatus):

@@ -129,6 +129,8 @@ class JobcanDIConfig:
         - 2 ("WARNING"): 警告以上通知
         - 3 ("ERROR"): エラーのみ通知
         """
+        self.clear_progress_on_error = _c['NOTIFICATION']['CLEAR_PROGRESS_ON_ERROR'].value
+        """エラー発生時に進捗状況をクリアするか"""
 
         self.logging_to_console = _c['DEBUGGING']['LOG_TO_CONSOLE'].value
         """ログ出力をコンソールにも行うか"""

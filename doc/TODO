@@ -18,6 +18,7 @@ DB構造(いずれも変更時は`データベース構造.md`を編集のこと
 
 integrator:
     ☐ `config.ini`が削除されても復帰可能なように、データを保持するソースとかを追加する
+    ✔ `.update_progress`と`.logger`を統合して隠蔽する @done(24-08-16 21:21)
     app_statusの追加:
         ☐ app_statusを追加する
         ☐ app_statusで読込先config.iniが指定された場合はそちらを優先して読み込むようにする

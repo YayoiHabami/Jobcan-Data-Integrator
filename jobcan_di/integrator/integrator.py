@@ -56,17 +56,19 @@ from jobcan_di.database import (
     users as u_io,
     requests as r_io
 )
-from .integrator_config import JobcanDIConfig, LogLevel, MAX_LOG_LEVEL_LENGTH
+from .integrator_config import JobcanDIConfig, LogLevel
+from . import integrator_errors as ie
+from . import integrator_warnings as iw
 from ._json_data_io import save_response_to_json
+from ._logger import Logger
 from . import progress_status as ps
 from .progress_status import (
     ProgressStatus,
     DetailedProgressStatus,
     InitializingStatus,
-    GetBasicDataStatus,
-    GetFormOutlineStatus,
     GetFormDetailStatus,
     TerminatingStatus,
+    ErrorStatus,
     APIType
 )
 from ._tf_io import JobcanTempFileIO
@@ -78,6 +80,7 @@ from ._toast_notification import ToastProgressNotifier
 #
 # Data Integrator
 #
+
 class JobcanDataIntegrator:
     """
     JobcanのAPIを使用してデータを取得するクラス
@@ -104,10 +107,12 @@ class JobcanDataIntegrator:
 
         # 変数の初期化
         self.app_id = "ジョブカン API"
-        self._log_path = self.config.default_log_path
         self._headers = {}
+        """APIリクエストのヘッダ。トークンを含み、ヘッダが空でない場合はトークンが有効であることを示す"""
         self._request = ThrottledRequests(self.config.requests_per_sec)
         self._conn = None
+        self._logger = Logger(self.config.default_log_path)
+        """ロガー"""
         self._notifier = ToastProgressNotifier(self.app_id,
                                                app_icon_path=self.config.app_icon_png_path)
         """進捗通知クラス"""
@@ -128,9 +133,8 @@ class JobcanDataIntegrator:
         self._init_token()
         self._init_connection()
         self._init_tables()
-        self.logger(ProgressStatus.INITIALIZING,
-                    "初期化が完了しました",
-                    LogLevel.INFO)
+        self._update_progress(ProgressStatus.INITIALIZING,
+                              InitializingStatus.COMPLETED, 1, 1)
 
     def __enter__(self):
         return self
@@ -145,44 +149,32 @@ class JobcanDataIntegrator:
     def _init_logger(self):
         """ロガーの初期化 (出力先など)"""
         # 出力先の設定
-        try:
-            self._log_path = self.config.log_path
-            if not os.path.exists(os.path.dirname(self.config.log_path)):
-                os.makedirs(os.path.dirname(self.config.log_path))
-        except OSError:
-            pass
+        s = self._logger.init_logger(self.config.log_path, self.config.log_encoding,
+                                     init_log = self.config.log_init=="ALWAYS_ON_STARTUP",
+                                     logging_to_console=self.config.logging_to_console)
 
-        if self.config.log_init == "ALWAYS_ON_STARTUP":
-            # 毎回初期化する設定の場合はログファイルを初期化
-            if os.path.exists(self._log_path):
-                with open(self._log_path, "w", encoding=self.config.log_encoding) as f:
-                    f.write("")
+        # 'config.ini'のLOG_PATHが不正な場合はWarningを出力
+        if not s:
+            self._logger.log(ProgressStatus.INITIALIZING,
+                             iw.InvalidLogFilePath(self.config.log_path).warning_message(),
+                             LogLevel.WARNING)
 
+        self._update_progress(ProgressStatus.INITIALIZING,
+                              InitializingStatus.INIT_LOGGER, 1, 1)
+
+    def _init_progress_notification(self):
+        """進捗に関するトースト通知の初期化"""
         # 本アプリケーションに関するトースト通知を全て削除
         if self.config.clear_previous_notifications_on_startup:
             self._notifier.clear_notifications()
 
-        # 'config.ini'のLOG_PATHが不正な場合はエラーを出力
-        if self._log_path != self.config.log_path:
-            self.logger(
-                ProgressStatus.INITIALIZING,
-                "'config.ini'で指定されたログファイルのパスが不正です。"
-                +"デフォルトのログファイルを使用します: {self.config.default_log_path}",
-                LogLevel.WARNING
-            )
-
-        self.update_progress(ProgressStatus.INITIALIZING,
-                             InitializingStatus.INIT_LOGGER, 1, 1)
-
-    def _init_progress_notification(self):
-        """進捗に関するトースト通知の初期化"""
         # トースト通知の作成
         self._notifier.init_notification(title=self.app_id, body="初期化中...",
                                          suppress_popup=True)
 
         # 進捗状況の更新
-        self.update_progress(ProgressStatus.INITIALIZING,
-                             InitializingStatus.INIT_NOTIFICATION, 1, 1)
+        self._update_progress(ProgressStatus.INITIALIZING,
+                              InitializingStatus.INIT_NOTIFICATION, 1, 1)
 
     def _init_directories(self):
         """ディレクトリの初期化"""
@@ -195,8 +187,8 @@ class JobcanDataIntegrator:
             os.makedirs(self.config.json_dir)
 
         # 進捗状況の更新
-        self.update_progress(ProgressStatus.INITIALIZING,
-                             InitializingStatus.INIT_DIRECTORIES, 1, 1)
+        self._update_progress(ProgressStatus.INITIALIZING,
+                              InitializingStatus.INIT_DIRECTORIES, 1, 1)
 
     def _init_token(self):
         """APIトークンの初期化"""
@@ -214,16 +206,10 @@ class JobcanDataIntegrator:
         if not token:
             # APIトークンが設定されていない場合はエラーを出力して終了
             if self.config.api_token_env == "":
-                self.logger(ProgressStatus.INITIALIZING,
-                            "'setting.ini'にトークン取得先の環境変数名が指定されていません。"
-                            + "TOKEN_ENV_NAMEを指定するか、API_TOKENにトークンを設定してください。",
-                            LogLevel.ERROR)
+                self._update_progress(ProgressStatus.FAILED, ie.TokenMissingEnvEmpty())
             elif self.config.api_token_env not in os.environ:
-                self.logger(
-                    ProgressStatus.INITIALIZING,
-                    f"指定された環境変数 {self.config.api_token_env} が設定されていません。環境変数の設定を行ってください。",
-                    LogLevel.ERROR
-                )
+                self._update_progress(ProgressStatus.FAILED,
+                                      ie.TokenMissingEnvNotFound(self.config.api_token_env))
             self.cleanup()
             sys.exit(1)
 
@@ -231,8 +217,8 @@ class JobcanDataIntegrator:
         self.update_token(token)
 
         # 進捗状況の更新
-        self.update_progress(ProgressStatus.INITIALIZING,
-                             InitializingStatus.INIT_TOKEN, 1, 1)
+        self._update_progress(ProgressStatus.INITIALIZING,
+                              InitializingStatus.INIT_TOKEN, 1, 1)
 
     def _init_connection(self):
         """データベースとの接続の初期化"""
@@ -244,15 +230,13 @@ class JobcanDataIntegrator:
         try:
             self._conn = sqlite3.connect(self.config.db_path)
         except sqlite3.Error as e:
-            self.logger(ProgressStatus.INITIALIZING,
-                        f"データベースの接続に失敗しました: {e}",
-                        LogLevel.ERROR)
+            self._update_progress(ProgressStatus.FAILED, ie.DatabaseConnectionFailed(e))
             self.cleanup()
             sys.exit(1)
 
         # 進捗状況の更新
-        self.update_progress(ProgressStatus.INITIALIZING,
-                             InitializingStatus.INIT_DB_CONNECTION, 1, 1)
+        self._update_progress(ProgressStatus.INITIALIZING,
+                              InitializingStatus.INIT_DB_CONNECTION, 1, 1)
 
     def _init_tables(self):
         """テーブルの初期化"""
@@ -263,11 +247,8 @@ class JobcanDataIntegrator:
         r_io.create_tables(self._conn)
 
         # 進捗状況の更新
-        self.logger(ProgressStatus.INITIALIZING,
-                    "データベースの準備が完了しました",
-                    LogLevel.INFO)
-        self.update_progress(ProgressStatus.INITIALIZING,
-                             InitializingStatus.INIT_DB_TABLES, 1, 1)
+        self._update_progress(ProgressStatus.INITIALIZING,
+                              InitializingStatus.INIT_DB_TABLES, 1, 1)
 
     def update_token(self, token:str):
         """トークンの更新および有効性の確認
@@ -282,18 +263,12 @@ class JobcanDataIntegrator:
         # トークンの有効性を確認
         response = self._request.get(self.config.base_url+'/test/', headers=headers)
         if response.status_code != 200:
-            self.logger(ProgressStatus.INITIALIZING,
-                        f"APIトークンが無効です。設定を確認してください (トークン: {token[:3]}{'*'*(len(token)-3)})",
-                        LogLevel.ERROR)
-            print(response.json())
+            self._update_progress(ProgressStatus.FAILED, ie.TokenInvalid(token))
             self.cleanup()
             sys.exit(1)
 
         # トークンの更新
         self._headers = headers
-        self.logger(ProgressStatus.INITIALIZING,
-                    f"APIトークン ({token[:3]}{'*'*(len(token)-3)}) の認証に成功しました",
-                    LogLevel.INFO)
 
     def _get_headers(self, token:str) -> dict:
         """ヘッダを取得する
@@ -307,37 +282,20 @@ class JobcanDataIntegrator:
             'Content-Type': 'application/json'
         }
 
-    def logger(self, status:ProgressStatus,
-               text:str,
-               level:LogLevel=LogLevel.INFO):
-        """ログ出力"""
-        text = (f"[{level.name}]".ljust(MAX_LOG_LEVEL_LENGTH+3)
-                + f"{datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')}, "
-                + f"{status.name},".ljust(ps.MAX_STATUS_LENGTH+2)
-                + text)
-        # ログファイルに書き込み
-        with open(self._log_path, "a", encoding=self.config.log_encoding) as f:
-            f.write(text + "\n")
-
-        # コンソールに出力
-        if self.config.logging_to_console:
-            print(text)
-
-        # トースト通知
-        if self.config.notify_log_level <= level.value:
-            self._notifier.notify(title=self.app_id, body=text, level=level)
-
-    def update_progress(self, status:ProgressStatus,
-                        sub_status:DetailedProgressStatus,
-                        current:int, total:Union[int,None],
-                        sub_count:int=0, sub_total_count:int=0):
+    def _update_progress(
+            self,
+            status:ProgressStatus,
+            sub_status:Union[DetailedProgressStatus, ie.JDIErrorData, iw.JDIWarningData],
+            current:int=0, total:Union[int,None]=None,
+            sub_count:int=0, sub_total_count:int=0
+        ) -> None:
         """進捗状況を更新する
 
         Parameters
         ----------
         status : ProgressStatus
             大枠の進捗状況
-        sub_status : DetailedProgressStatus
+        sub_status : DetailedProgressStatus | JDIWarning
             細かい進捗状況、InitializingStatusなど
         current : int
             現在の進捗
@@ -355,9 +313,32 @@ class JobcanDataIntegrator:
         self.progress_outline = status
         self.progress_detail = sub_status
 
+        # ログメッセージを取得
+        if isinstance(sub_status, ie.JDIErrorData):
+            level = LogLevel.ERROR
+            message = sub_status.error_message()
+        elif isinstance(sub_status, iw.JDIWarningData):
+            level = LogLevel.WARNING
+            message = sub_status.warning_message()
+        else:
+            level = LogLevel.ERROR if isinstance(sub_status, ErrorStatus) else LogLevel.INFO
+            message = ps.get_progress_status_msg(status, sub_status, sub_count, sub_total_count)
+
+        # ログ出力
+        self._logger.log(status, message, level)
+
+        # トースト通知
+        if self.config.notify_log_level <= level.value:
+            self._notifier.notify(title=self.app_id, body=message, level=level)
+
         # 通知を更新
-        self._notifier.update(status, sub_status, current, total,
-                              sub_count, sub_total_count)
+        if (level == LogLevel.INFO
+            or (level == LogLevel.ERROR and self.config.clear_progress_on_error)):
+            self._notifier.update(
+                status,
+                sub_status.status if isinstance(sub_status, ie.JDIErrorData) else sub_status,
+                current, total, sub_count, sub_total_count
+            )
 
     #
     # メイン処理
@@ -383,11 +364,8 @@ class JobcanDataIntegrator:
         # 全処理が完了
         if not self._is_canceled:
             self._completed = True
-            self.logger(ProgressStatus.TERMINATING,
-                        "全ての処理が完了しました",
-                        LogLevel.INFO)
-            self.update_progress(ProgressStatus.TERMINATING,
-                                 TerminatingStatus.COMPLETED, 1, 1)
+            self._update_progress(ProgressStatus.TERMINATING,
+                                  TerminatingStatus.COMPLETED, 1, 1)
 
     def run(self):
         """メイン処理を実行する
@@ -403,9 +381,7 @@ class JobcanDataIntegrator:
         try:
             self._run()
         except Exception as e:
-            self.logger(ProgressStatus.FAILED,
-                        f"エラーが発生しました: {e}",
-                        LogLevel.ERROR)
+            self._update_progress(ProgressStatus.FAILED, ie.UnknownError(e))
             self._completed = False
             return
 
@@ -429,9 +405,9 @@ class JobcanDataIntegrator:
         skip_on_error : bool, default False
             エラーが発生した場合にスキップするかどうか、Falseの場合は処理を終了する
         sub_count : int, default 0
-            第2段階進捗に可算する値 -> update_progress() に渡す
+            第2段階進捗に可算する値 -> _update_progress() に渡す
         sub_total_count : int, default 0
-            第2段階進捗の全体数に可算する値 -> update_progress() に渡す
+            第2段階進捗の全体数に可算する値 -> _update_progress() に渡す
 
         Returns
         -------
@@ -444,28 +420,22 @@ class JobcanDataIntegrator:
         - この関数では申請書データ (詳細) は取得できません
         """
         assert api_type != APIType.REQUEST_DETAIL, "この関数では申請書データ (詳細) は取得できません"
-        target_data_name = ps.API_TYPE_NAME[api_type]
 
         url = self.config.api_base_url[api_type] + query
         page_num = 1
         total_count = 0
-        self.logger(ProgressStatus.BASIC_DATA,
-                    f"{target_data_name}を取得中...",
-                    LogLevel.INFO)
-        self.update_progress(ps.get_progress_status(api_type),
-                             ps.get_detailed_progress_status(api_type),
-                             total_count, None,
-                             sub_count, sub_total_count)
+        self._update_progress(ps.get_progress_status(api_type),
+                              ps.get_detailed_progress_status(api_type),
+                              total_count, None,
+                              sub_count, sub_total_count)
         results = []
         while True:
             res = self._request.get(url, headers=self._headers)
 
             if (code:=res.status_code) != 200:
-                # 正常なレスポンスが返ってこなかった場合
-                error_message = res.json()['message']
-                self.logger(ProgressStatus.BASIC_DATA,
-                            f"{target_data_name}の取得に失敗しました: (code={code}, {error_message})",
-                            LogLevel.ERROR)
+                # 正常なレスポンスが返ってこなかった場合)
+                self._update_progress(ProgressStatus.FAILED,
+                                      ie.get_api_error(api_type, code, res, query))
                 if skip_on_error:
                     # エラーが発生した場合にスキップする場合、現時点で取得したデータを返す
                     return {'success': False, 'results': results}
@@ -478,13 +448,10 @@ class JobcanDataIntegrator:
                                       self.config.json_encoding)
 
             total_count += len(res_j['results'])
-            self.logger(ProgressStatus.BASIC_DATA,
-                        f"{target_data_name}の取得完了: {total_count}/{res_j['count']}",
-                        LogLevel.INFO)
-            self.update_progress(ps.get_progress_status(api_type),
-                                 ps.get_detailed_progress_status(api_type),
-                                 total_count, res_j['count'],
-                                 sub_count, sub_total_count)
+            self._update_progress(ps.get_progress_status(api_type),
+                                  ps.get_detailed_progress_status(api_type),
+                                  total_count, res_j['count'],
+                                  sub_count, sub_total_count)
 
             if not res_j['next']:
                 # 次のページが存在しない場合にループを抜ける
@@ -520,9 +487,8 @@ class JobcanDataIntegrator:
         try:
             update_func(self._conn, data)
         except sqlite3.Error as e:
-            self.logger(ProgressStatus.BASIC_DATA,
-                        f"{ps.API_TYPE_NAME[api_type]}の更新に失敗しました: {e}",
-                        LogLevel.ERROR)
+            self._update_progress(ProgressStatus.BASIC_DATA,
+                                  iw.DBUpdateFailed(api_type, e))
             return False
         return True
 
@@ -615,8 +581,8 @@ class JobcanDataIntegrator:
     def _update_form_detail(self) -> bool:
         """申請書データ (詳細) の取得＆更新"""
         # 一時ファイルの読み込み
-        self.update_progress(ProgressStatus.FORM_DETAIL,
-                             GetFormDetailStatus.SEEK_TARGET, 0, 1)
+        self._update_progress(ProgressStatus.FORM_DETAIL,
+                              GetFormDetailStatus.SEEK_TARGET, 0, None)
         request_ids = self._tmp_io.load_form_outline()
 
         for i, item in enumerate(request_ids.items()):
@@ -631,18 +597,17 @@ class JobcanDataIntegrator:
                     headers=self._headers
                 )
                 if (_code:=res.status_code) != 200:
-                    self.logger(
+                    self._update_progress(
                         ProgressStatus.FORM_DETAIL,
-                        f"申請書データ (詳細) の取得に失敗しました: (code={_code}, {res.json()['message']})",
-                        LogLevel.ERROR
+                        iw.get_form_detail_api_warning(_code, res.json(), request_id)
                     )
                     continue
                 # 申請書データ (詳細) をデータベースに保存
                 self._update_data(r_io.update, res.json(), APIType.REQUEST_DETAIL)
-                self.update_progress(ProgressStatus.FORM_DETAIL,
-                                     ps.get_detailed_progress_status(APIType.REQUEST_DETAIL),
-                                     j+1, len(data['ids']),
-                                     i+1, len(request_ids)-1)
+                self._update_progress(ProgressStatus.FORM_DETAIL,
+                                      ps.get_detailed_progress_status(APIType.REQUEST_DETAIL),
+                                      j+1, len(data['ids']),
+                                      i+1, len(request_ids)-1)
 
         return False # TODO: 未実装
         # 全申請書データの更新に成功したら最終更新日時を更新
