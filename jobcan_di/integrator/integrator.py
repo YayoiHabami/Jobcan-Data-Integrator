@@ -70,7 +70,7 @@ from .progress_status import (
 )
 from ._tf_io import JobcanTempFileIO
 from .throttled_request import ThrottledRequests
-from ._toast_notification import notify, clear_toast, NotificationData, ToastNotificationManager
+from ._toast_notification import ToastProgressNotifier
 
 
 
@@ -107,10 +107,9 @@ class JobcanDataIntegrator:
         self._headers = {}
         self._request = ThrottledRequests(self.config.requests_per_sec)
         self._conn = None
-        self._notification_data = None
-        """トースト通知のデータ (トースト通知の更新に使用)"""
-        self._notifier = None
-        """トースト通知の管理クラス (トースト通知の更新に使用)"""
+        self._notifier = ToastProgressNotifier(self.app_id,
+                                               app_icon_path=self.config.app_icon_png_path)
+        """進捗通知クラス"""
         self._completed = False
         """全ての処理が完了したかどうか、中断された場合もFalse"""
         self.progress_outline: ProgressStatus = ProgressStatus.INITIALIZING
@@ -136,6 +135,10 @@ class JobcanDataIntegrator:
     def __exit__(self, exc_type, exc_value, traceback):
         self.cleanup()
 
+    #
+    # 初期化処理関連
+    #
+
     def _init_logger(self):
         """ロガーの初期化 (出力先など)"""
         # 出力先の設定
@@ -154,7 +157,7 @@ class JobcanDataIntegrator:
 
         # 本アプリケーションに関するトースト通知を全て削除
         if self.config.clear_previous_notifications_on_startup:
-            clear_toast(app_id=self.app_id)
+            self._notifier.clear_notifications()
 
         # 'config.ini'のLOG_PATHが不正な場合はエラーを出力
         if self._log_path != self.config.log_path:
@@ -168,24 +171,8 @@ class JobcanDataIntegrator:
     def _init_progress_notification(self):
         """進捗に関するトースト通知の初期化"""
         # トースト通知の作成
-        notify(progress = {
-            'title': '初期化中...',
-            'status': '初期化中...',
-            'value': 0,
-            'valueStringOverride': '0%',
-            },
-            app_id = self.app_id,
-            group=LogLevel.INFO.name,
-            scenario="reminder",
-            icon=self.config.app_icon_png_path[LogLevel.INFO],
-            title=self.app_id,
-            body='しばらくお待ちください...',
-            duration='short',
-            suppress_popup=True # 通知センターにのみ表示
-        )
-        # NotificationDataとNotifierの初期化
-        self._notification_data = NotificationData()
-        self._notifier = ToastNotificationManager.create_toast_notifier(self.app_id)
+        self._notifier.init_notification(title=self.app_id, body="初期化中...",
+                                         suppress_popup=True)
 
         # 進捗状況の更新
         self.update_progress(ProgressStatus.INITIALIZING,
@@ -332,11 +319,7 @@ class JobcanDataIntegrator:
 
         # トースト通知
         if self.config.notify_log_level <= level.value:
-            notify(title=self.app_id,
-                   body=text,
-                   app_id=self.app_id,
-                   group=level.name,
-                   icon=self.config.app_icon_png_path[level],)
+            self._notifier.notify(title=self.app_id, body=text, level=level)
 
     def update_progress(self, status:ProgressStatus,
                         sub_status:DetailedProgressStatus,
@@ -366,29 +349,13 @@ class JobcanDataIntegrator:
         self.progress_outline = status
         self.progress_detail = sub_status
 
-        # Notifier が未初期化の場合は何もしない (._init_progress_notification()の呼び出し前)
-        if self._notifier is None:
-            return
+        # 通知を更新
+        self._notifier.update(status, sub_status, current, total,
+                              sub_count, sub_total_count)
 
-        # sub_statusのメッセージを取得
-        status_msg = ps.get_progress_status_msg(status, sub_status, sub_count, sub_total_count)
-        if total is None:
-            value = 0 if current == 0 else 1
-            str_value = f"{current}/?"
-        elif total == 0:
-            value = 1
-            str_value = "0/0"
-        else:
-            value = current / total
-            str_value = f"{current}/{total}"
-
-        self._notification_data.values['title'] = ps.PROGRESS_STATUS_MSG[status]
-        self._notification_data.values['status'] = status_msg
-        self._notification_data.values['value'] = str(value)
-        self._notification_data.values['valueStringOverride'] = str_value
-        self._notification_data.sequence_number = 2
-
-        self._notifier.update(self._notification_data, 'my_tag', LogLevel.INFO.name)
+    #
+    # メイン処理
+    #
 
     def _run(self):
         """メイン処理"""

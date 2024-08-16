@@ -1,4 +1,14 @@
 """
+トースト通知関連のモジュール
+
+Classes
+-------
+- `ToastProgressNotifier`: トースト通知を用いた進捗通知クラス
+
+License
+-------
+MIT License
+
 Original work Copyright (c) 2022 言葉
 Modified work Copyright (c) 2024 Yayoi Habami
 
@@ -21,7 +31,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union, Dict
 
 from winsdk.windows.data.xml.dom import XmlDocument
 from winsdk.windows.ui.notifications import (
@@ -42,6 +52,13 @@ from win11toast import (
     DEFAULT_APP_ID,
     xml,
     clear_toast
+)
+
+from .integrator_config import LogLevel
+from .progress_status import (
+    ProgressStatus, DetailedProgressStatus,
+    get_progress_status_msg,
+    PROGRESS_STATUS_MSG
 )
 
 
@@ -120,3 +137,160 @@ def notify(title=None, body=None, on_click=print,
         notifier = ToastNotificationManager.create_toast_notifier(app_id)
     notifier.show(notification)
     return notification
+
+
+
+
+class ToastProgressNotifier:
+    """トースト通知を用いた進捗通知クラス
+
+    トースト通知を用いて進捗状況を通知するためのクラス"""
+    def __init__(self, app_id=DEFAULT_APP_ID,
+                 app_icon_path:Optional[Dict[LogLevel, str]]=None):
+        """コンストラクタ
+
+        Parameters
+        ----------
+        app_id : str, default DEFAULT_APP_ID
+            通知アプリケーションのID
+        app_icon_path : Optional[Dict[LogLevel, str]], default None
+            通知アプリケーションのアイコンへのパス、LogLevel毎に指定"""
+        self._app_id = app_id
+        self._app_icon_path = app_icon_path
+
+        self._notification_data = NotificationData()
+        self._notifier = None
+
+    def init_notification(
+            self, title:str, body:str,
+            duration:str="short", scenario="reminder", suppress_popup:bool=True
+        ) -> None:
+        """トースト通知の初期化
+
+        Parameters
+        ----------
+        title : str
+            通知のタイトル
+        body : str
+            通知の本文
+        duration : str, default "short"
+            通知の表示時間、
+            "short", "long" が指定可能
+        scenario : str, default "reminder"
+            通知のシナリオ、
+            "reminder", "alarm", "incomingCall", "urgent" が指定可能。
+            "incomingCall" の場合、通知のタイムアウトが無効になる
+        suppress_popup : bool, default True
+            通知のポップアップを抑制するかどうか、
+            `False` の場合、通知センターにのみ通知が表示される
+        """
+        # トースト通知の初期化
+        notify(
+            progress = {
+                "title": "初期化中...",
+                "status": "初期化中...",
+                "value": 0,
+                "valueStringOverride": "0%",
+            },
+            app_id = self._app_id,
+            group = LogLevel.INFO.name,
+            title = title,
+            body = body,
+            icon = self._app_icon_path[LogLevel.INFO] if self._app_icon_path else None,
+            duration = duration,
+            suppress_popup = suppress_popup,
+            scenario = scenario
+        )
+
+        self._notifier = ToastNotificationManager.create_toast_notifier(self._app_id)
+
+    def update(self,
+               status:ProgressStatus,
+               sub_status:DetailedProgressStatus,
+               current:int, total:Union[int,None],
+               sub_count:int=0, sub_total_count:int=0):
+        """進捗状況を更新する
+
+        Parameters
+        ----------
+        status : ProgressStatus
+            大枠の進捗状況
+        sub_status : DetailedProgressStatus
+            細かい進捗状況、InitializingStatusなど
+        current : int
+            現在の進捗
+        total : Union[int,None]
+            全体の進捗
+            Noneの場合、valueが0なら0%、それ以外なら100%として扱われる
+        sub_count : int, default 0
+            第2段階進捗に可算する値、基本的には0
+            ProgressStatus.FORM_OUTLINEの場合に使用
+        sub_total_count : int, default 0
+            第2段階進捗の全体数に可算する値、基本的には0
+            ProgressStatus.FORM_OUTLINEの場合に使用
+        """
+        # Notifier が未初期化の場合は何もしない (._init_notification()の呼び出し前)
+        if self._notifier is None:
+            return
+
+        # sub_statusのメッセージを取得
+        status_msg = get_progress_status_msg(status, sub_status, sub_count, sub_total_count)
+        if total is None:
+            value = 0 if current == 0 else 1
+            str_value = f"{current}/?"
+        elif total == 0:
+            value = 1
+            str_value = "0/0"
+        else:
+            value = current / total
+            str_value = f"{current}/{total}"
+
+        self._notification_data.values['title'] = PROGRESS_STATUS_MSG[status]
+        self._notification_data.values['status'] = status_msg
+        self._notification_data.values['value'] = str(value)
+        self._notification_data.values['valueStringOverride'] = str_value
+        self._notification_data.sequence_number = 2
+
+        self._notifier.update(self._notification_data, 'my_tag', LogLevel.INFO.name)
+
+    def notify(self, title:str, body:str,
+               level:LogLevel=LogLevel.INFO,
+               duration:str="short", scenario="reminder",
+               suppress_popup:bool=True):
+        """トースト通知を表示する
+
+        Parameters
+        ----------
+        title : str
+            通知のタイトル
+        body : str
+            通知の本文
+        level : LogLevel, default LogLevel.INFO
+            通知のレベル
+        duration : str, default "short"
+            通知の表示時間、
+            "short", "long" が指定可能
+        scenario : str, default "reminder"
+            通知のシナリオ、
+            "reminder", "alarm", "incomingCall", "urgent" が指定可能。
+            "incomingCall" の場合、通知のタイムアウトが無効になる
+        suppress_popup : bool, default False
+            通知のポップアップを抑制するかどうか、
+            `False` の場合、通知センターにのみ通知が表示される
+        """
+        notify(
+            title = title,
+            body = body,
+            app_id = self._app_id,
+            group = level.name,
+            icon = self._app_icon_path[level] if self._app_icon_path else None,
+            duration = duration,
+            suppress_popup = suppress_popup,
+            scenario = scenario
+        )
+
+    def clear_notifications(self):
+        """トースト通知をクリアする
+
+        以前の通知も含めて、本アプリケーションによる全てのトースト通知をクリアする"""
+        clear_toast(self._app_id)
