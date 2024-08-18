@@ -23,7 +23,7 @@ class AppProgress:
     """アプリケーションの進捗状況を管理するクラス
     """
     status_outline: ProgressStatus = ProgressStatus.TERMINATING
-    status_detail: DetailedProgressStatus = TerminatingStatus.COMPLETED
+    status_detail: Optional[DetailedProgressStatus] = TerminatingStatus.COMPLETED
 
     def is_completed(self) -> bool:
         """アプリケーションの進捗が完了しているかどうか
@@ -204,10 +204,16 @@ class JobcanDIStatus:
     ----------
     progress : AppProgress
         前回/現在の進捗状況
+        `.load()` での読み込み時に `ProgressStatus.TERMINATING` かつ
+        `TerminatingStatus.COMPLETED` の場合は進捗状況をリセットする
+        (`ProgressStatus.INITIALIZING` & `None` に設定)
     fetch_failure_record : FetchFailureRecord
         データ取得に失敗した対象
     config_file_path : str, default ""
         優先して読み込むコンフィグファイル
+    form_api_last_access : Dict[int, str]
+        申請書(概要)のAPIで最後にデータを取得した日時、
+        キーはform_id、値は日時(文字列)
     """
 
     def __init__(self, dir_path:str):
@@ -242,16 +248,23 @@ class JobcanDIStatus:
         with open(self._file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        self.progress = AppProgress(
-            status_outline=ProgressStatus[data["status_outline"]],
-            status_detail = get_detailed_progress_status_from_str(data["status_outline"],
-                                                                  data["status_detail"])
-        )
+        # 進捗状況の読み込み
+        p_outline = ProgressStatus[data["status_outline"]]
+        p_detail = get_detailed_progress_status_from_str(data["status_outline"],
+                                                         data["status_detail"])
+        if p_outline == ProgressStatus.TERMINATING and p_detail == TerminatingStatus.COMPLETED:
+            # 進捗状況が終了済みの場合は進捗状況をリセット
+            p_outline = ProgressStatus.INITIALIZING
+            p_detail = None
+        self.progress = AppProgress(status_outline = p_outline, status_detail = p_detail)
 
+        # データ取得に失敗した対象の読み込み
         self.fetch_failure_record = FetchFailureRecord(**data["fetch_failure_record"])
 
+        # 優先して読み込むコンフィグファイルの読み込み
         self.config_file_path = data.get("config_file_path", "")
 
+        # 申請書(概要)のAPIで最後にデータを取得した日時の読み込み
         self.form_api_last_access = {
             int(k): v for k, v in data.get("form_api_last_access", {}).items()
         }

@@ -81,6 +81,14 @@ def test_jobcan_di_status(tmp_path):
     assert new_status.fetch_failure_record.get(APIType.USER_V3) == ["123"]
     assert new_status.form_api_last_access == last_access
 
+    # 保存と読み込みのテスト (前回保存時に最後まで実行された場合、進捗を初期化)
+    status.progress.status_outline = ProgressStatus.TERMINATING
+    status.progress.status_detail = TerminatingStatus.COMPLETED
+    status.save()
+    new_status.load()
+    assert new_status.progress.status_outline == ProgressStatus.INITIALIZING
+    assert new_status.progress.status_detail is None
+
 # エラーケースのテスト
 def test_fetch_failure_record_errors():
     record = FetchFailureRecord()

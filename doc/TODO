@@ -31,6 +31,9 @@ integrator:
         ✔ app_statusを追加する @done(24-08-18 13:56)
         ✔ app_statusで読込先config.iniが指定された場合はそちらを優先して読み込むようにする @done(24-08-18 14:36)
         ✔ "last_access"を追加し、最終アクセス日時を記録する @done(24-08-18 16:38)
+        ✔ `AppProgress`の`status_detail`を`Optional`型に変更する @done(24-08-18 20:17)
+        ✔ app_status 読み込み時に "status_detail" が `TerminatingStatus.COMPLETED` である場合、`JobcanDIStatus.progress`を初期化前の状態に戻す @done(24-08-18 20:48)
+        ☐ `AppProgress`に細かい進捗状況 (intかstrのリスト、終了したものを格納する) を追加する
     ☐ `ThrottledRequest`で`request.exceptions.ReadTimeout`が発生した場合の処理を追加する（キャッチ）
     データ取得:
         ☐ 更新中にcountが増えた場合の処理
@@ -40,6 +43,11 @@ integrator:
     データ管理:
         ☐ データが減少した場合の処理
     進捗管理:
+        ☐ `app_status`の進捗に応じて、開始位置を変更する
+            ✔ `InitializingStatus`の場合は冒頭から開始する @done(24-08-18 21:03)
+            ✔ それ以外の場合、指定されたステータスから再度開始する @done(24-08-18 22:29)
+            ☐ `AppProgress`の細かい進捗状況に応じて、FormOutline/FormDetailの開始位置を変更する
+            ☐ 再度開始するための`.restart`メソッドを追加する (`TerminatingStatus.COMPLETED`でなければ`.is_canceled`を`False`にして再開:`._initialize`と`.run`を実行)
         例外処理:
             ✔ (以降の処理を行わない)致命的なエラーが発生した場合に、`._is_canceled`を`True`にする @done(24-08-18 15:27)
             ✔ 各処理の冒頭に、`._is_canceled`が`True`になっていないかの判定を追加する @done(24-08-18 15:27)
