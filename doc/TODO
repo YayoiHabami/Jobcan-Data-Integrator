@@ -18,6 +18,12 @@ DB構造(いずれも変更時は`データベース構造.md`を編集のこと
 
 integrator:
     ☐ `config.ini`が削除されても復帰可能なように、データを保持するソースとかを追加する
+    リソースの追加:
+        ✔ `JobcanDIConfig`のコンストラクタ引数に`resource_dir`を追加、指定されない場合は`app_dir`を使うようにする @done(24-08-18 12:19)
+        ✔ 通知時の基本3アイコンを`resources/icons/toast`に追加 @done(24-08-18 12:03)
+        ✔ アプリケーションののアイコンを`resources/icons/app`に追加 @done(24-08-18 12:03)
+        ☐ トースト通知にアイコンを表示させる
+        ☐ `nuitka`によるビルドにアイコンを追加
     app_statusの追加:
         ☐ app_statusを追加する
         ☐ app_statusで読込先config.iniが指定された場合はそちらを優先して読み込むようにする
