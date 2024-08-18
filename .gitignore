@@ -10,6 +10,7 @@ experiments/
 *.log
 *.csv
 *.json
+app_status
 
 # Build (nuitka)
 *.build/

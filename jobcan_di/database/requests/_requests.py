@@ -12,6 +12,7 @@ Target
 """
 import json
 import sqlite3
+from typing import Optional, Literal, Union
 
 from ._data_class import FileDataList
 from ._customized_items import retrieve_customized_items, update_customized_items
@@ -195,3 +196,41 @@ def retrieve(cursor:sqlite3.Cursor,
     j_data["detail"]["modify_logs"] = retrieve_modify_logs(cursor, request_id)
 
     return j_data
+
+def retrieve_ids(
+        cursor:sqlite3.Cursor,
+        form_id: Union[int, str],
+        *,
+        status: Optional[set[Literal["in_progress", "completed",
+                                     "rejected", "canceled", "returned",
+                                     "canceled_after_completion"]]] = None,
+        ant_status: Optional[set[Literal["in_progress", "completed",
+                                         "rejected", "canceled", "returned",
+                                         "canceled_after_completion"]]] = None
+    ) -> list[str]:
+    """Retrieve request IDs from the database.
+
+    Args:
+        cursor: SQLite3 cursor object
+        form_id: Form ID
+        status: Request status
+        ant_status: Request status to exclude
+
+    Note:
+        status and ant_status cannot be specified at the same time.
+    """
+    if status is not None and ant_status is not None:
+        raise ValueError("status and ant_status cannot be specified at the same time.")
+
+    query = "SELECT id FROM requests WHERE form_id = ?"
+    params = [form_id]
+    if status is not None:
+        query += " AND status IN (" + ", ".join("?" * len(status)) + ")"
+        params.extend(status)
+    elif ant_status is not None:
+        query += " AND status NOT IN (" + ", ".join("?" * len(ant_status)) + ")"
+        params.extend(ant_status)
+
+    cursor.execute(query, params)
+
+    return [r[0] for r in cursor.fetchall()]

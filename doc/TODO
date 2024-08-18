@@ -19,31 +19,59 @@ DB構造(いずれも変更時は`データベース構造.md`を編集のこと
 integrator:
     ☐ `config.ini`が削除されても復帰可能なように、データを保持するソースとかを追加する
     ✔ `.update_progress`と`.logger`を統合して隠蔽する @done(24-08-16 21:21)
+    ☐ キャンセル時にapp_statusを保存するべきか検証する
+    非同期処理:
+        ☐ `JobcanDataIntegrator` の `._initialize` の各処理を非同期処理に変更する
+        ☐ `JobcanDataIntegrator` の `._run` の各処理を非同期処理に変更する
+        ☐ トースト通知に cancel ボタンを追加する
+        ☐ トースト通知に stop/restart ボタンを追加する
     リソースの追加:
         ✔ `JobcanDIConfig`のコンストラクタ引数に`resource_dir`を追加、指定されない場合は`app_dir`を使うようにする @done(24-08-18 12:19)
         ✔ 通知時の基本3アイコンを`resources/icons/toast`に追加 @done(24-08-18 12:03)
         ✔ アプリケーションののアイコンを`resources/icons/app`に追加 @done(24-08-18 12:03)
         ☐ トースト通知にアイコンを表示させる
         ☐ `nuitka`によるビルドにアイコンを追加
+        ☐ `JobcanDIConfig`の`.app_icon_png_path`を`.toast_icon_path`に変更
+        ☐ `JobcanDIConfig`に`.app_icon_path`を追加
     app_statusの追加:
-        ☐ app_statusを追加する
-        ☐ app_statusで読込先config.iniが指定された場合はそちらを優先して読み込むようにする
+        ✔ app_statusを追加する @done(24-08-18 13:56)
+        ✔ app_statusで読込先config.iniが指定された場合はそちらを優先して読み込むようにする @done(24-08-18 14:36)
+        ✔ "last_access"を追加し、最終アクセス日時を記録する @done(24-08-18 16:38)
+        ✔ `AppProgress`の`status_detail`を`Optional`型に変更する @done(24-08-18 20:17)
+        ✔ app_status 読み込み時に "status_detail" が `TerminatingStatus.COMPLETED` である場合、`JobcanDIStatus.progress`を初期化前の状態に戻す @done(24-08-18 20:48)
+        ✔ `AppProgress`に細かい進捗状況 (intかstrのリスト、終了したものを格納する) を追加する @done(24-08-19 10:53)
+        ☐ `JobcanDIStatus.load`からデータの読み込み部分を分離
     ☐ `ThrottledRequest`で`request.exceptions.ReadTimeout`が発生した場合の処理を追加する（キャッチ）
     データ取得:
         ☐ 更新中にcountが増えた場合の処理
         ☐ `null`になりえる全データについて、それがなくなった場合の処理
         ☐ 差分更新の実装
-        ☐ 申請書データ(概要)の取得に際して、`form_id`の時期条件を設定可能にする
+        ✔ 申請書データ(概要)の取得に際して、`form_id`の時期条件を設定可能にする @done(24-08-18 16:53)
     データ管理:
         ☐ データが減少した場合の処理
     進捗管理:
+        ☐ `app_status`の進捗に応じて、開始位置を変更する
+            ✔ `InitializingStatus`の場合は冒頭から開始する @done(24-08-18 21:03)
+            ✔ それ以外の場合、指定されたステータスから再度開始する @done(24-08-18 22:29)
+            ✔ `AppProgress`の細かい進捗状況に応じて、FormOutlineの開始位置を変更する @done(24-08-19 18:22)
+            ☐ `AppProgress`の細かい進捗状況に応じて、FormDetailの開始位置を変更する
+            ✔ `FetchFailureRecord`の`._basic_data`等の値を`set[str]`に変更する @done(24-08-20 11:04)
+            ☐ 読み込み時に`FetchFailureRecord`が空でないAPIについて、再度処理を行うなどの処理を追加する
+                ☐ `JobcanDataIntegrator._is_future_progress`に条件分岐を追加する
+            ☐ 再度開始するための`.restart`メソッドを追加する (`TerminatingStatus.COMPLETED`でなければ`.is_canceled`を`False`にして再開:`._initialize`と`.run`を実行)
         例外処理:
-            ☐ (以降の処理を行わない)致命的なエラーが発生した場合に、`._is_canceled`を`True`にする
-            ☐ 各処理の冒頭に、`._is_canceled`が`True`になっていないかの判定を追加する
+            ✔ (以降の処理を行わない)致命的なエラーが発生した場合に、`._is_canceled`を`True`にする @done(24-08-18 15:27)
+            ✔ 各処理の冒頭に、`._is_canceled`が`True`になっていないかの判定を追加する @done(24-08-18 15:27)
             ☐ ディレクトリ作成時に、指定されたディレクトリへのアクセス権がない場合の処理を追加
-            ☐ トークン認証失敗時に、`sys.exit`を投げないようにする (`._init_token`)
-            ☐ 同上 (`.update_token) ⇒ `bool`を返すようにし、それを受け取った側で処理を行う
-            ☐ DB接続失敗時に、`sys.exit`を投げないようにする (`._init_connection`)
+            ✔ トークン認証失敗時に、`sys.exit`を投げないようにする (`._init_token`) @done(24-08-18 15:27)
+            ✔ 同上 (`.update_token) ⇒ `bool`を返すようにし、それを受け取った側で処理を行う @done(24-08-18 15:31)
+            ✔ DB接続失敗時に、`sys.exit`を投げないようにする (`._init_connection`) @done(24-08-18 15:28)
+            ☐ 接続エラー`requests.exceptions.ConnectionError`が発生した場合の処理を追加する
+                ☐ `JobcanDataIntegrator._fetch_xxx`の戻り値を`"success"`からJDIErrorインスタンスorNoneに変更
+                ☐ エラーの場合、前回と今回の進捗を合成する
+                ☐ エラーの場合、`.cancel`してreturnする
+                ☐ `.restart`メソッドを追加する
+                ☐ `app.py`側で接続エラーの場合の処理を追加する
             ☐ テーブルを正常に作成できているかの確認を追加 (`._init_tables`)
         完了時処理:
             ✔ `JobcanDataIntegrator.update_progress`について、`ProgressStatus.TERMINATING`である場合の処理を追加 (他の値の`None`を許容) @done(24-08-16 16:05)
@@ -55,15 +83,23 @@ integrator:
             ☐ positionsの取得に失敗した場合、その旨をapp_statusに記録する
             ☐ positionsの保存に失敗した場合、失敗した要素の`position_code`などを併せてapp_statusに記録する
         FORM_OUTLINE:
-            ☐ form取得に失敗した場合、その旨をapp_statusに記録する
+            ✔ form取得に失敗した場合、その旨をapp_statusに記録する (→`.app_status.fetch_failure_record`) @done(24-08-20 15:28)
             ☐ formの保存に失敗した場合、失敗した要素の`form_id`などを併せてapp_statusに記録する
-            ☐ 各formの更新要素の取得に失敗した場合、その旨をapp_statusに記録する
+            ✔ 各formの更新要素の取得に失敗した場合、その旨をapp_statusに記録する @done(24-08-20 15:30)
+                ✔ 一つでも取得ミスがあればその取得は失敗となるよう`._fetch_form_outline_data`を変更する @done(24-08-20 15:20)
+                ✔ 取得に失敗した場合、一時ファイルへの保存時に"success"はFalseとし、"lastAccess"を更新しないようにする @done(24-08-20 15:25)
+            ☐ `&completed_after=lastAccess&status=canceled_after_completion`である要素を取得するようにする
+            ☐ `._update_form_outline`の`._update_progress`をまとめる
+            ☐ `._update_form_outline`の`.config.app_status.progress.add_specifics`をまとめる
         FORM_DETAIL:
-            ☐ 申請書のステータスが`canceled_after_completion`,`completed`,`in_progress`,`returned`,`rejected`の5つのみであるかを確認
-            ☐ 読込対象として、一時ファイルのIDだけでなく`requests`テーブルの継続中のIDも取得する
-            ☐ 各申請書の取得に失敗した場合、その旨をapp_statusに記録する
+            ✔ 一時ファイルへの保存 @done(24-08-20 22:03)
+                ✔ 申請書データの取得の成功ごとに一時ファイルからrequest_idを削除する @done(24-08-20 22:02)
+                ✔ すべてのrequest_idがなくなった場合にのみ、一時ファイルを削除する @done(24-08-19 17:58)
+            ✔ 申請書のステータスが`canceled_after_completion`,`completed`,`in_progress`,`returned`,`rejected`の5つのみであるかを確認 -> `実行フロー.md` @done(24-08-20 16:22)
+            ✔ 読込対象として、一時ファイルのIDだけでなく`requests`テーブルの継続中のIDも取得する @done(24-08-20 22:03)
+            ✔ 各申請書の取得に失敗した場合、その旨をapp_statusに記録する @done(24-08-20 22:03)
             ☐ 各申請書の保存に失敗した場合、失敗した要素の`request_id`などを併せてapp_statusに記録する
-            ☐ `._update_form_detail`の最後まで進んだらapp_statusの最終更新日時を更新
+            ✔ `._update_form_detail`の最後まで進んだらapp_statusの最終更新日時を更新 @done(24-08-20 22:03)
 
 ConfigEditorGUI:
     ☐ タイトル・トップページの作成
