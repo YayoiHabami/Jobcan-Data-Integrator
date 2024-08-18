@@ -6,6 +6,7 @@ Functions
 - `get_progress_status_msg`: ProgressStatusと各進捗状況に対応するメッセージを取得
 - `get_progress_status`: APIの種類に応じた進捗状況を取得
 - `get_detailed_progress_status`: APIの種類に応じた詳細な進捗状況を取得
+- `get_detailed_progress_status_from_str`: 進捗状況の文字列からDetailedProgressStatusを取得
 
 Classes
 -------
@@ -214,6 +215,34 @@ def get_progress_status_msg(status:ProgressStatus, sub_status:DetailedProgressSt
     elif status == ProgressStatus.FAILED:
         return "更新に失敗しました"
     return ""
+
+def get_detailed_progress_status_from_str(
+        status:str, sub_status:str
+        ) -> DetailedProgressStatus:
+    """進捗状況の文字列からDetailedProgressStatusを取得する
+
+    Parameters
+    ----------
+    status : str
+        大枠の進捗状況
+    sub_status : str
+        細かい進捗状況
+
+    Returns
+    -------
+    DetailedProgressStatus
+        進捗状況 (詳細)"""
+    if status == ProgressStatus.INITIALIZING.name:
+        return InitializingStatus[sub_status]
+    elif status == ProgressStatus.BASIC_DATA.name:
+        return GetBasicDataStatus[sub_status]
+    elif status == ProgressStatus.FORM_OUTLINE.name:
+        return GetFormOutlineStatus[sub_status]
+    elif status == ProgressStatus.FORM_DETAIL.name:
+        return GetFormDetailStatus[sub_status]
+    elif status == ProgressStatus.TERMINATING.name:
+        return TerminatingStatus[sub_status]
+    return ErrorStatus.UNKNOWN_ERROR
 
 
 #
