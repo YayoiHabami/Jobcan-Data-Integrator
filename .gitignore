@@ -14,3 +14,6 @@ experiments/
 # Build (nuitka)
 *.build/
 *.dist/
+
+# Resources
+*.pptx

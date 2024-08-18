@@ -23,6 +23,7 @@ LogLevel: ログレベル
 """
 from enum import Enum
 from os import path, makedirs
+from typing import Optional
 
 from jobcan_di.config.config_editor import ConfigEditor
 from .progress_status import APIType
@@ -45,13 +46,16 @@ class JobcanDIConfig:
     Jobcan Data Integratorの設定を管理するクラス
     """
 
-    def __init__(self, app_dir:str):
+    def __init__(self, app_dir:str, resource_dir:Optional[str]=None):
         """
         Parameters
         ----------
         app_dir : str
             アプリケーションのディレクトリ
             この下に設定ファイルや前回の進捗状況などを保存するディレクトリが作成される
+        resource_dir : str, optional
+            リソースディレクトリ（アイコンなど）のパス
+            指定しない場合は app_dir/resources が使用される
         """
         self.settings_dir = path.join(app_dir, 'config')
         """設定ファイルや前回の進捗状況などを保存するディレクトリ"""
@@ -154,9 +158,12 @@ class JobcanDIConfig:
         }
         """APIのベースURL"""
 
+        if resource_dir is None:
+            resource_dir = path.join(app_dir, 'resources')
+
         self.app_icon_png_path = {
-            LogLevel.INFO: path.join(app_dir, 'resources', 'normal_icon.png'),
-            LogLevel.WARNING: path.join(app_dir, 'resources', 'warning_icon.png'),
-            LogLevel.ERROR: path.join(app_dir, 'resources', 'error_icon.png')
+            LogLevel.INFO: path.join(resource_dir, "icons", "toast", 'normal_icon.png'),
+            LogLevel.WARNING: path.join(resource_dir, "icons", "toast", 'warning_icon.png'),
+            LogLevel.ERROR: path.join(resource_dir, "icons", "toast", 'error_icon.png')
         }
         """本アプリケーションのトースト通知用アイコンのパス"""
