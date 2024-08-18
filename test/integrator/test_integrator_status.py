@@ -62,11 +62,14 @@ def test_jobcan_di_status(tmp_path):
         'request_detail': {}
     }
     assert status.fetch_failure_record.asdict() == expected_dict
+    assert status.form_api_last_access == {}
 
     # データの設定
     status.progress.status_outline = ProgressStatus.INITIALIZING
     status.progress.status_detail = InitializingStatus.COMPLETED
     status.fetch_failure_record.add(APIType.USER_V3, "123")
+    last_access = {1: "2021-01-01T00:00:00", 2: "2021-01-02T00:00:00"}
+    status.form_api_last_access = last_access
 
     # 保存と読み込みのテスト
     status.save()
@@ -76,6 +79,7 @@ def test_jobcan_di_status(tmp_path):
     assert new_status.progress.status_outline == ProgressStatus.INITIALIZING
     assert new_status.progress.status_detail == InitializingStatus.COMPLETED
     assert new_status.fetch_failure_record.get(APIType.USER_V3) == ["123"]
+    assert new_status.form_api_last_access == last_access
 
 # エラーケースのテスト
 def test_fetch_failure_record_errors():

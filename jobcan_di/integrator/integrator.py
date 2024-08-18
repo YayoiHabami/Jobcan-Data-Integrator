@@ -590,22 +590,27 @@ class JobcanDataIntegrator:
             succeeded &= self._update_data(f_io.update, res, APIType.FORM_V1)
 
         # 申請書データ (概要) 取得
-        # TODO: 作成日時の範囲を指定可能にする（コンフィグファイルで指定？）
-        #       最終更新日時に関しては、DBに保存されている
         ids = f_io.retrieve_form_ids(self._conn)
         tmp_data = {id: None for id in ids}
         # 取得開始日時を設定
-        tmp_data["lastAccess"] = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
         for i, form_id in enumerate(ids):
+            query = f"?form_id={form_id}"
+            # 前回の取得日時以降のデータのみ取得
+            prev_access = self.config.app_status.form_api_last_access.get(form_id, None)
+            if prev_access:
+                query += f"&applied_after={prev_access}"
+
+            last_access = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
             form_outline_data = self._get_basic_data_with_API(APIType.REQUEST_OUTLINE,
-                                                              query=f"?form_id={form_id}",
+                                                              query=query,
                                                               sub_count=i+1,
                                                               sub_total_count=len(ids))
             succeeded &= form_outline_data['success']
             # 申請書データ (概要) を一時ファイルに保存
             tmp_data[form_id] = {
                 'success': form_outline_data['success'],
-                'ids': [res['id'] for res in form_outline_data['results']]
+                'ids': [res['id'] for res in form_outline_data['results']],
+                'lastAccess': last_access
             }
             # NOTE: 新規記録対象が10000件程度でも保存にかかる時間は0.1s程度のため、毎回直接保存する
             self._tmp_io.save_form_outline(tmp_data)
@@ -621,9 +626,6 @@ class JobcanDataIntegrator:
 
         for i, item in enumerate(request_ids.items()):
             form_id, data = item
-            print(f"{form_id=}")
-            if form_id == "lastAccess":
-                continue
             for j, request_id in enumerate(data['ids']):
                 # 申請書データ (詳細) 取得
                 res = self._request.get(
@@ -643,9 +645,11 @@ class JobcanDataIntegrator:
                                       j+1, len(data['ids']),
                                       i+1, len(request_ids)-1)
 
-        return False # TODO: 未実装
-        # 全申請書データの更新に成功したら最終更新日時を更新
-        last_access = request_ids["lastAccess"]
+                # 最終更新日時を更新
+                self.config.app_status.form_api_last_access[form_id] = data['lastAccess']
+
+        self.cancel() # TODO: 未実装
+        return False
 
         return True
 

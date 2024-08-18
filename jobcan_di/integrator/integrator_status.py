@@ -231,6 +231,8 @@ class JobcanDIStatus:
         """データ取得に失敗した対象"""
         self.config_file_path = ""
         """優先して読み込むコンフィグファイル"""
+        self.form_api_last_access: Dict[int, str] = {}
+        """申請書(概要)のAPIで最後にデータを取得した日時"""
 
     def load(self) -> None:
         """ステータスファイルを読み込む"""
@@ -250,6 +252,10 @@ class JobcanDIStatus:
 
         self.config_file_path = data.get("config_file_path", "")
 
+        self.form_api_last_access = {
+            int(k): v for k, v in data.get("form_api_last_access", {}).items()
+        }
+
     def save(self) -> None:
         """ステータスファイルに保存する"""
         with open(self._file_path, "w", encoding="utf-8") as f:
@@ -257,5 +263,6 @@ class JobcanDIStatus:
                 "status_outline": self.progress.status_outline.name,
                 "status_detail": self.progress.status_detail.name,
                 "fetch_failure_record": self.fetch_failure_record.asdict(),
-                "config_file_path": self.config_file_path
+                "config_file_path": self.config_file_path,
+                "form_api_last_access": self.form_api_last_access
             }, f)
