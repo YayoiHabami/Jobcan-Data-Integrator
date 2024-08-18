@@ -119,14 +119,7 @@ class JobcanDataIntegrator:
         self._tmp_io = JobcanTempFileIO(os.getcwd())
 
         # 初期化処理
-        self._init_logger()
-        self._init_progress_notification()
-        self._init_directories()
-        self._init_token()
-        self._init_connection()
-        self._init_tables()
-        self._update_progress(ProgressStatus.INITIALIZING,
-                              InitializingStatus.COMPLETED, 1, 1)
+        self._initialize()
 
     def __enter__(self):
         return self
@@ -137,6 +130,27 @@ class JobcanDataIntegrator:
     #
     # 初期化処理関連
     #
+
+    def _initialize(self):
+        """初期化処理"""
+        self._init_logger()
+        self._init_progress_notification()
+        self._init_directories()
+
+        self._init_token()
+        if self.is_canceled():
+            return
+
+        self._init_connection()
+        if self.is_canceled():
+            return
+
+        self._init_tables()
+        if self.is_canceled():
+            return
+
+        self._update_progress(ProgressStatus.INITIALIZING,
+                              InitializingStatus.COMPLETED, 1, 1)
 
     def _init_logger(self):
         """ロガーの初期化 (出力先など)"""
@@ -202,11 +216,12 @@ class JobcanDataIntegrator:
             elif self.config.api_token_env not in os.environ:
                 self._update_progress(ProgressStatus.FAILED,
                                       ie.TokenMissingEnvNotFound(self.config.api_token_env))
-            self.cleanup()
-            sys.exit(1)
+            return self.cancel()
 
         # トークンの更新・有効性の確認
-        self.update_token(token)
+        if not self.update_token(token):
+            # 指定されたトークンが無効な場合は終了
+            return self.cancel()
 
         # 進捗状況の更新
         self._update_progress(ProgressStatus.INITIALIZING,
@@ -223,8 +238,7 @@ class JobcanDataIntegrator:
             self._conn = sqlite3.connect(self.config.db_path)
         except sqlite3.Error as e:
             self._update_progress(ProgressStatus.FAILED, ie.DatabaseConnectionFailed(e))
-            self.cleanup()
-            sys.exit(1)
+            return self.cancel()
 
         # 進捗状況の更新
         self._update_progress(ProgressStatus.INITIALIZING,
@@ -242,25 +256,31 @@ class JobcanDataIntegrator:
         self._update_progress(ProgressStatus.INITIALIZING,
                               InitializingStatus.INIT_DB_TABLES, 1, 1)
 
-    def update_token(self, token:str):
+    def update_token(self, token:str) -> bool:
         """トークンの更新および有効性の確認
 
         Parameters
         ----------
         token : str
             新しいAPIトークン
+
+        Returns
+        -------
+        bool
+            トークンの更新が成功したかどうか
         """
         headers = self._get_headers(token)
 
         # トークンの有効性を確認
         response = self._request.get(self.config.base_url+'/test/', headers=headers)
         if response.status_code != 200:
+            # トークンが無効
             self._update_progress(ProgressStatus.FAILED, ie.TokenInvalid(token))
-            self.cleanup()
-            sys.exit(1)
+            return False
 
         # トークンの更新
         self._headers = headers
+        return True
 
     def _get_headers(self, token:str) -> dict:
         """ヘッダを取得する
@@ -338,34 +358,45 @@ class JobcanDataIntegrator:
         """アプリケーションの状態を保存する"""
         self.config.app_status.save()
 
-    def get(self) -> Tuple[ProgressStatus, DetailedProgressStatus]:
+    #
+    # プロパティ
+    #
+
+    def get_progress(self) -> Tuple[ProgressStatus, DetailedProgressStatus]:
         """進捗状況を取得する"""
         return self.config.app_status.progress.get()
+
+    def is_canceled(self) -> bool:
+        """処理がキャンセルされたかどうか"""
+        return self._is_canceled
 
 
     #
     # メイン処理
     #
 
+    def cancel(self):
+        """処理をキャンセルする"""
+        self._is_canceled = True
+        self._completed = False
+        self.cleanup()
+
     def _run(self):
         """メイン処理"""
         # 基本データの取得
-        if (not self._is_canceled) and (not self._update_basic_data()):
-            self._completed = False
+        if (not self.is_canceled()) and (not self._update_basic_data()):
             return
 
         # 申請書データ (概要) の取得
-        if (not self._is_canceled) and (not self._update_form_outline()):
-            self._completed = False
+        if (not self.is_canceled()) and (not self._update_form_outline()):
             return
 
         # 申請書データ (詳細) の取得
-        if (not self._is_canceled) and (not self._update_form_detail()):
-            self._completed = False
+        if (not self.is_canceled()) and (not self._update_form_detail()):
             return
 
         # 全処理が完了
-        if not self._is_canceled:
+        if not self.is_canceled():
             self._completed = True
             self._update_progress(ProgressStatus.TERMINATING,
                                   TerminatingStatus.COMPLETED, 1, 1)

@@ -41,12 +41,12 @@ integrator:
         ☐ データが減少した場合の処理
     進捗管理:
         例外処理:
-            ☐ (以降の処理を行わない)致命的なエラーが発生した場合に、`._is_canceled`を`True`にする
-            ☐ 各処理の冒頭に、`._is_canceled`が`True`になっていないかの判定を追加する
+            ✔ (以降の処理を行わない)致命的なエラーが発生した場合に、`._is_canceled`を`True`にする @done(24-08-18 15:27)
+            ✔ 各処理の冒頭に、`._is_canceled`が`True`になっていないかの判定を追加する @done(24-08-18 15:27)
             ☐ ディレクトリ作成時に、指定されたディレクトリへのアクセス権がない場合の処理を追加
-            ☐ トークン認証失敗時に、`sys.exit`を投げないようにする (`._init_token`)
-            ☐ 同上 (`.update_token) ⇒ `bool`を返すようにし、それを受け取った側で処理を行う
-            ☐ DB接続失敗時に、`sys.exit`を投げないようにする (`._init_connection`)
+            ✔ トークン認証失敗時に、`sys.exit`を投げないようにする (`._init_token`) @done(24-08-18 15:27)
+            ✔ 同上 (`.update_token) ⇒ `bool`を返すようにし、それを受け取った側で処理を行う @done(24-08-18 15:31)
+            ✔ DB接続失敗時に、`sys.exit`を投げないようにする (`._init_connection`) @done(24-08-18 15:28)
             ☐ テーブルを正常に作成できているかの確認を追加 (`._init_tables`)
         完了時処理:
             ✔ `JobcanDataIntegrator.update_progress`について、`ProgressStatus.TERMINATING`である場合の処理を追加 (他の値の`None`を許容) @done(24-08-16 16:05)
