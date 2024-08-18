@@ -47,7 +47,7 @@ import datetime
 import os
 import sqlite3
 import sys
-from typing import Union, Optional
+from typing import Union, Optional, Tuple
 
 from jobcan_di.database import (
     forms as f_io,
@@ -84,6 +84,11 @@ from ._toast_notification import ToastProgressNotifier
 class JobcanDataIntegrator:
     """
     JobcanのAPIを使用してデータを取得するクラス
+
+    Attributes
+    ----------
+    app_id : str
+        アプリケーションID
     """
 
     def __init__(self, config:Optional[JobcanDIConfig]=None):
@@ -93,15 +98,6 @@ class JobcanDataIntegrator:
         ----------
         config : Optional[JobcanDIConfig], default None
             コンフィグ、読み込むconfig.iniを変更したい場合はここから指定
-
-        Attributes
-        ----------
-        app_id : str
-            アプリケーションID
-        progress_outline : ProgressStatus
-            進捗状況の概要
-        progress_detail : Optional[DetailedProgressStatus]
-            進捗状況の詳細、InitializingStatusなど
         """
         self.config = JobcanDIConfig(os.getcwd()) if config is None else config
 
@@ -120,10 +116,6 @@ class JobcanDataIntegrator:
         """全ての処理が完了したかどうか、中断された場合もFalse"""
         self._is_canceled = False
         """致命的なエラーが発生し、以降の処理を行えなくなった場合はTrue"""
-        self.progress_outline: ProgressStatus = ProgressStatus.INITIALIZING
-        """進捗状況の概要"""
-        self.progress_detail: Optional[DetailedProgressStatus] = None
-        """進捗状況の詳細、InitializingStatusなど"""
         self._tmp_io = JobcanTempFileIO(os.getcwd())
 
         # 初期化処理
@@ -310,8 +302,7 @@ class JobcanDataIntegrator:
             ProgressStatus.FORM_OUTLINEの場合に使用
         """
         # 自身の進捗状況を更新
-        self.progress_outline = status
-        self.progress_detail = sub_status
+        self.config.app_status.progress.set(status, sub_status)
 
         # ログメッセージを取得
         if isinstance(sub_status, ie.JDIErrorData):
@@ -339,6 +330,18 @@ class JobcanDataIntegrator:
                 sub_status.status if isinstance(sub_status, ie.JDIErrorData) else sub_status,
                 current, total, sub_count, sub_total_count
             )
+
+        # ステータスを更新
+        self.save_status()
+
+    def save_status(self):
+        """アプリケーションの状態を保存する"""
+        self.config.app_status.save()
+
+    def get(self) -> Tuple[ProgressStatus, DetailedProgressStatus]:
+        """進捗状況を取得する"""
+        return self.config.app_status.progress.get()
+
 
     #
     # メイン処理

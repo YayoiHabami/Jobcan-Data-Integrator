@@ -29,7 +29,8 @@ integrator:
         ☐ `JobcanDIConfig`に`.app_icon_path`を追加
     app_statusの追加:
         ✔ app_statusを追加する @done(24-08-18 13:56)
-        ☐ app_statusで読込先config.iniが指定された場合はそちらを優先して読み込むようにする
+        ✔ app_statusで読込先config.iniが指定された場合はそちらを優先して読み込むようにする @done(24-08-18 14:36)
+        ☐ "last_access"を追加し、最終アクセス日時を記録する
     ☐ `ThrottledRequest`で`request.exceptions.ReadTimeout`が発生した場合の処理を追加する（キャッチ）
     データ取得:
         ☐ 更新中にcountが増えた場合の処理

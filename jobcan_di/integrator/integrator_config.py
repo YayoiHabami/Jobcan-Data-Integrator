@@ -27,6 +27,7 @@ from typing import Optional
 
 from jobcan_di.config.config_editor import ConfigEditor
 from .progress_status import APIType
+from .integrator_status import JobcanDIStatus
 
 
 
@@ -59,18 +60,23 @@ class JobcanDIConfig:
         """
         self.settings_dir = path.join(app_dir, 'config')
         """設定ファイルや前回の進捗状況などを保存するディレクトリ"""
-        self.config_file = path.join(self.settings_dir, 'config.ini')
-        """コンフィグファイル"""
-        self.app_status_file = path.join(self.settings_dir, 'app_status')
-        """前回の進捗状況などを保存するファイル"""
-
-        # 上記ディレクトリ/ファイルが存在しない場合は作成
+        # ディレクトリが存在しない場合は作成
         if not path.exists(self.settings_dir):
             makedirs(self.settings_dir)
+
+        self.app_status = JobcanDIStatus(self.settings_dir)
+        """Jobcan Data Integrator クラスのステータス管理クラス"""
+        # ステータスの読み込み (初回起動時は初期化)
+        self.app_status.load()
+
+        self.config_file = path.join(self.settings_dir, 'config.ini')
+        """コンフィグファイル"""
+        # 設定ファイルのパスが指定されている場合は上書き
+        if self.app_status.config_file_path != "":
+            self.config_file = self.app_status.config_file_path
+        # 設定ファイルが存在しない場合は初期化
         if not path.exists(self.config_file):
             pass # TODO: config.iniの初期化（存在しない場合のみ）
-        if not path.exists(self.app_status_file):
-            pass # TODO: api_status.jsonの初期化（存在しない場合のみ）
 
         _c = ConfigEditor(self.config_file, encoding='utf-8')
 

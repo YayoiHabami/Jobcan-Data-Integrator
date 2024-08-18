@@ -55,8 +55,8 @@ def test_jobcan_di_status(tmp_path):
     status = JobcanDIStatus(str(tmp_path))
 
     # 初期状態の確認
-    assert status.previous_status.status_outline == ProgressStatus.TERMINATING
-    assert status.previous_status.status_detail == TerminatingStatus.COMPLETED
+    assert status.progress.status_outline == ProgressStatus.TERMINATING
+    assert status.progress.status_detail == TerminatingStatus.COMPLETED
     expected_dict = {
         'basic_data': {v.name: [] for v in APIType if v != APIType.REQUEST_DETAIL},
         'request_detail': {}
@@ -64,8 +64,8 @@ def test_jobcan_di_status(tmp_path):
     assert status.fetch_failure_record.asdict() == expected_dict
 
     # データの設定
-    status.previous_status.status_outline = ProgressStatus.INITIALIZING
-    status.previous_status.status_detail = InitializingStatus.COMPLETED
+    status.progress.status_outline = ProgressStatus.INITIALIZING
+    status.progress.status_detail = InitializingStatus.COMPLETED
     status.fetch_failure_record.add(APIType.USER_V3, "123")
 
     # 保存と読み込みのテスト
@@ -73,8 +73,8 @@ def test_jobcan_di_status(tmp_path):
     new_status = JobcanDIStatus(str(tmp_path))
     new_status.load()
 
-    assert new_status.previous_status.status_outline == ProgressStatus.INITIALIZING
-    assert new_status.previous_status.status_detail == InitializingStatus.COMPLETED
+    assert new_status.progress.status_outline == ProgressStatus.INITIALIZING
+    assert new_status.progress.status_detail == InitializingStatus.COMPLETED
     assert new_status.fetch_failure_record.get(APIType.USER_V3) == ["123"]
 
 # エラーケースのテスト

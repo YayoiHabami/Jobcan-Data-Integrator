@@ -10,7 +10,7 @@ Classes
 from dataclasses import dataclass
 import json
 from os import path, makedirs
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, Tuple
 
 from .progress_status import (
     ProgressStatus, DetailedProgressStatus, TerminatingStatus,
@@ -34,6 +34,29 @@ class AppProgress:
             完了している場合は True
         """
         return self.status_detail == TerminatingStatus.COMPLETED
+
+    def get(self) -> Tuple[ProgressStatus, DetailedProgressStatus]:
+        """進捗状況を取得する
+
+        Returns
+        -------
+        Tuple[ProgressStatus, DetailedProgressStatus]
+            進捗状況
+        """
+        return self.status_outline, self.status_detail
+
+    def set(self, status_outline:ProgressStatus, status_detail:DetailedProgressStatus) -> None:
+        """進捗状況を設定する
+
+        Parameters
+        ----------
+        status_outline : ProgressStatus
+            大まかな進捗状況
+        status_detail : DetailedProgressStatus
+            詳細な進捗状況
+        """
+        self.status_outline = status_outline
+        self.status_detail = status_detail
 
 
 class FetchFailureRecord:
@@ -179,8 +202,8 @@ class JobcanDIStatus:
 
     Attributes
     ----------
-    previous_status : AppProgress
-        前回の進捗状況
+    progress : AppProgress
+        前回/現在の進捗状況
     fetch_failure_record : FetchFailureRecord
         データ取得に失敗した対象
     config_file_path : str, default ""
@@ -202,8 +225,8 @@ class JobcanDIStatus:
 
         self._file_path = path.join(dir_path, "app_status")
 
-        self.previous_status = AppProgress()
-        """前回の進捗状況"""
+        self.progress = AppProgress()
+        """前回/現在の進捗状況"""
         self.fetch_failure_record = FetchFailureRecord()
         """データ取得に失敗した対象"""
         self.config_file_path = ""
@@ -217,7 +240,7 @@ class JobcanDIStatus:
         with open(self._file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        self.previous_status = AppProgress(
+        self.progress = AppProgress(
             status_outline=ProgressStatus[data["status_outline"]],
             status_detail = get_detailed_progress_status_from_str(data["status_outline"],
                                                                   data["status_detail"])
@@ -231,8 +254,8 @@ class JobcanDIStatus:
         """ステータスファイルに保存する"""
         with open(self._file_path, "w", encoding="utf-8") as f:
             json.dump({
-                "status_outline": self.previous_status.status_outline.name,
-                "status_detail": self.previous_status.status_detail.name,
+                "status_outline": self.progress.status_outline.name,
+                "status_detail": self.progress.status_detail.name,
                 "fetch_failure_record": self.fetch_failure_record.asdict(),
                 "config_file_path": self.config_file_path
             }, f)
