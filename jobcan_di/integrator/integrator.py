@@ -92,9 +92,9 @@ class JobcanDataIntegrator:
 
     Properties
     ----------
-    get_progress : Tuple[ProgressStatus, DetailedProgressStatus]
+    progress : Tuple[ProgressStatus, DetailedProgressStatus]
         進捗状況を取得する（致命的なエラーが発生した場合はエラー発生時の進捗状況を返す）
-    get_current_progress : Tuple[ProgressStatus, DetailedProgressStatus]
+    current_progress : Tuple[ProgressStatus, DetailedProgressStatus]
         現在の進捗状況を取得する（致命的なエラーが発生した場合はエラーの詳細を返す）
     is_canceled : bool
         処理がキャンセルされたかどうか
@@ -128,10 +128,15 @@ class JobcanDataIntegrator:
         self._is_canceled = False
         """致命的なエラーが発生し、以降の処理を行えなくなった場合はTrue"""
         self._tmp_io = JobcanTempFileIO(os.getcwd())
-        self._current_progress = AppProgress(
-            *self.config.app_status.progress.get()
-        )
+        """一時ファイルの入出力クラス"""
+        self._current_progress = AppProgress()
         """現在の進捗状況、app_statusと異なり、失敗時にはFAILEDになる"""
+        self._previous_progress = AppProgress(
+            **self.config.app_status.progress.asdict()
+        )
+        """前回の進捗状況"""
+        self._issued_warnings: list[iw.JDIWarningData] = []
+        """実行中に発生した警告のログ"""
 
         # 初期化処理
         self._initialize()
@@ -148,10 +153,7 @@ class JobcanDataIntegrator:
 
     def _initialize(self):
         """初期化処理"""
-        # 進捗を確認
-        if self.get_current_progress[0] != ProgressStatus.INITIALIZING:
-            # 初期化が既に完了している場合は何もしない
-            return
+        # 前回の進捗状況に関わらず、初期化処理は毎回行う
 
         self._init_logger()
         self._init_progress_notification()
@@ -368,14 +370,19 @@ class JobcanDataIntegrator:
                 current, total, sub_count, sub_total_count
             )
 
-        # 進捗状況を更新 (警告は無視)
+        # 進捗状況を更新
         if isinstance(sub_status, DetailedProgressStatus):
+            # 進捗状況を更新
             self._current_progress.set(status, sub_status)
         elif isinstance(sub_status, ie.JDIErrorData):
+            # エラーの場合は進捗状況をFAILEDにして更新
             self._current_progress.set(ProgressStatus.FAILED, sub_status.status)
+        elif isinstance(sub_status, iw.JDIWarningData):
+            # 警告の場合はログに記録
+            self._issued_warnings.append(sub_status)
 
         if (status != ProgressStatus.FAILED) and (isinstance(sub_status, DetailedProgressStatus)):
-            # 失敗以外の場合、進捗状況を更新・保存
+            # 失敗以外の場合、app_status側の進捗状況を更新・保存
             self.config.app_status.progress.set(status, sub_status)
             self.save_status()
 
@@ -394,35 +401,38 @@ class JobcanDataIntegrator:
 
         Examples
         --------
-        `.is_cancel`が`False`かつ現在の進捗状況が`GetBasicDataStatus.GET_POSITION`の場合:
+        `.is_cancel`が`False`かつ前回の進捗状況が`GetBasicDataStatus.GET_POSITION`の場合:
         - `APIType.USER_V3` ⇒ `False`
         - `APIType.POSITION` ⇒ `True`
         - `APIType.REQUEST_DETAIL` ⇒ `True`
 
         `.is_cancel`が`True`、または現在の進捗状況が`ProgressStatus.FAILED`の場合、常に`False`を返す。
         """
-        if self.is_canceled or self.get_current_progress[0] == ProgressStatus.FAILED:
+        if self.is_canceled or self.current_progress[0] == ProgressStatus.FAILED:
             # キャンセルされた場合、またはエラーが発生した場合はFalse
             return False
 
         stat_outline_v = ps.get_progress_status(api_type).value
-        if stat_outline_v < self.get_current_progress[0].value:
+        if self._previous_progress.get()[0] == ProgressStatus.FAILED:
+            # 前回の進捗状況がエラーの場合はTrue (一応)
+            return True
+        elif stat_outline_v < self._previous_progress.get()[0].value:
             # 進捗状況が過去のものの場合はFalse
             return False
-        elif stat_outline_v > self.get_current_progress[0].value:
+        elif stat_outline_v > self._previous_progress.get()[0].value:
             # 進捗状況が未来のものの場合はTrue
             return True
 
         # 進捗状況が同じ場合は詳細進捗状況で判定
         stat_detail_v = ps.get_detailed_progress_status(api_type).value
-        return stat_detail_v >= self.get_current_progress[1].value
+        return stat_detail_v >= self._previous_progress.get()[1].value
 
     #
     # プロパティ
     #
 
     @property
-    def get_progress(self) -> Tuple[ProgressStatus, DetailedProgressStatus]:
+    def progress(self) -> Tuple[ProgressStatus, DetailedProgressStatus]:
         """進捗状況を取得する
 
         Returns
@@ -432,7 +442,7 @@ class JobcanDataIntegrator:
 
         Notes
         -----
-        - `.get_current_progress` とは異なり、致命的なエラーが発生した場合は
+        - `.current_progress` とは異なり、致命的なエラーが発生した場合は
           発生時の進捗状況を返す。
           - 例) `GetFormOutlineStatus.Get_OUTLINE` でエラーが発生した場合、
             `ProgressStatus.FORM_OUTLINE` と `GetFormOutlineStatus.Get_OUTLINE` を返す
@@ -440,7 +450,7 @@ class JobcanDataIntegrator:
         return self.config.app_status.progress.get()
 
     @property
-    def get_current_progress(self) -> Tuple[ProgressStatus, DetailedProgressStatus]:
+    def current_progress(self) -> Tuple[ProgressStatus, DetailedProgressStatus]:
         """現在の進捗状況を取得する
 
         Returns
@@ -450,7 +460,7 @@ class JobcanDataIntegrator:
 
         Notes
         -----
-        - `.get_progress` とは異なり、致命的なエラーが発生した場合は
+        - `.progress` とは異なり、致命的なエラーが発生した場合は
           `ProgressStatus.FAILED`と `ErrorStatus` を返す
         """
         return self._current_progress.get()
@@ -465,6 +475,10 @@ class JobcanDataIntegrator:
         """全ての処理が完了したかどうか、中断された場合はFalse"""
         return self._completed
 
+    @property
+    def issued_warnings(self) -> list[iw.JDIWarningData]:
+        """発生した警告のログ"""
+        return self._issued_warnings
 
     #
     # メイン処理
@@ -731,6 +745,14 @@ class JobcanDataIntegrator:
 
             # 取得開始日時を設定
             for i, form_id in enumerate(ids):
+                if form_id in self._previous_progress.specifics:
+                    # 既に取得済みの場合はスキップ
+                    self.config.app_status.progress.add_specifics(form_id)
+                    self._update_progress(ProgressStatus.FORM_OUTLINE,
+                                          ps.GetFormOutlineStatus.GET_OUTLINE,
+                                          1, 1, i+1, len(ids))
+                    continue
+
                 query = f"?form_id={form_id}"
                 # 前回の取得日時以降のデータのみ取得
                 prev_access = self.config.app_status.form_api_last_access.get(form_id, None)
@@ -753,6 +775,9 @@ class JobcanDataIntegrator:
                     tmp_data[form_id].last_access = last_access
                 # NOTE: 新規記録対象が10000件程度でも保存にかかる時間は0.1s程度のため、毎回直接保存する
                 self._tmp_io.save_form_outline(tmp_data)
+
+                # 進捗状況を更新 (一時ファイルへの保存が完了した時点でform_idをspecificsに追加)
+                self.config.app_status.progress.add_specifics(form_id)
 
         return succeeded
 
@@ -805,3 +830,5 @@ class JobcanDataIntegrator:
         # 全処理が正常に完了した場合、一時ファイルを削除
         if self._completed:
             self._tmp_io.cleanup()
+
+        self.save_status()
