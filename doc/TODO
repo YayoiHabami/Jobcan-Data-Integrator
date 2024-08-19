@@ -47,6 +47,7 @@ integrator:
             ✔ `InitializingStatus`の場合は冒頭から開始する @done(24-08-18 21:03)
             ✔ それ以外の場合、指定されたステータスから再度開始する @done(24-08-18 22:29)
             ☐ `AppProgress`の細かい進捗状況に応じて、FormOutline/FormDetailの開始位置を変更する
+            ☐ 読み込み時に`FetchFailureRecord`が空でないAPIについて、再度処理を行うなどの処理を追加する
             ☐ 再度開始するための`.restart`メソッドを追加する (`TerminatingStatus.COMPLETED`でなければ`.is_canceled`を`False`にして再開:`._initialize`と`.run`を実行)
         例外処理:
             ✔ (以降の処理を行わない)致命的なエラーが発生した場合に、`._is_canceled`を`True`にする @done(24-08-18 15:27)
@@ -70,6 +71,9 @@ integrator:
             ☐ formの保存に失敗した場合、失敗した要素の`form_id`などを併せてapp_statusに記録する
             ☐ 各formの更新要素の取得に失敗した場合、その旨をapp_statusに記録する
         FORM_DETAIL:
+            ☐ 一時ファイルへの保存
+                ☐ 申請書データの取得の成功ごとに一時ファイルからrequest_idを削除する
+                ✔ すべてのrequest_idがなくなった場合にのみ、一時ファイルを削除する @done(24-08-19 17:58)
             ☐ 申請書のステータスが`canceled_after_completion`,`completed`,`in_progress`,`returned`,`rejected`の5つのみであるかを確認
             ☐ 読込対象として、一時ファイルのIDだけでなく`requests`テーブルの継続中のIDも取得する
             ☐ 各申請書の取得に失敗した場合、その旨をapp_statusに記録する

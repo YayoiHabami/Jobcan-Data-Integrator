@@ -46,7 +46,6 @@ with JobcanDataIntegrator(config) as di:
 import datetime
 import os
 import sqlite3
-import sys
 from typing import Union, Optional, Tuple
 
 from jobcan_di.database import (
@@ -72,7 +71,7 @@ from .progress_status import (
     ErrorStatus,
     APIType
 )
-from ._tf_io import JobcanTempFileIO
+from ._tf_io import JobcanTempFileIO, TempFormOutline
 from .throttled_request import ThrottledRequests
 from ._toast_notification import ToastProgressNotifier
 
@@ -566,6 +565,7 @@ class JobcanDataIntegrator:
                 if skip_on_error:
                     # エラーが発生した場合にスキップする場合、現時点で取得したデータを返す
                     return {'success': False, 'results': results}
+                continue
 
             res_j = res.json()
             results.extend(res_j['results'])
@@ -587,6 +587,42 @@ class JobcanDataIntegrator:
             page_num += 1
 
         return {'success': True, 'results': results}
+
+    def _get_form_outline_data_with_API(
+                self,
+                query: str = "",
+                skip_on_error: bool = False,
+                sub_count: int = 0,
+                sub_total_count: int = 0) -> TempFormOutline:
+        """
+        APIを使用して申請書(概要)データを取得する
+
+        Parameters
+        ----------
+        api_type : APIType
+            取得するデータの種類
+        query : str, default ""
+            クエリ文字列
+            例) "?form_id=1234" (申請書データ (概要))
+        skip_on_error : bool, default False
+            エラーが発生した場合にスキップするかどうか、Falseの場合は処理を終了する
+        sub_count : int, default 0
+            第2段階進捗に可算する値 -> _update_progress() に渡す
+        sub_total_count : int, default 0
+            第2段階進捗の全体数に可算する値 -> _update_progress() に渡す
+        """
+        form_outline_data = self._get_basic_data_with_API(
+            APIType.REQUEST_OUTLINE,
+            query=query,
+            skip_on_error=skip_on_error,
+            sub_count=sub_count,
+            sub_total_count=sub_total_count
+        )
+
+        return TempFormOutline(
+            success = form_outline_data["success"],
+            ids = [res["id"] for res in form_outline_data["results"]]
+        )
 
     def _update_data(self, update_func, data:dict, api_type: APIType) -> bool:
         """DBへデータの更新を試みる。
@@ -689,7 +725,10 @@ class JobcanDataIntegrator:
         if self._is_future_progress(APIType.REQUEST_OUTLINE):
             # 申請書データ (概要) 取得
             ids = f_io.retrieve_form_ids(self._conn)
-            tmp_data = {id: None for id in ids}
+            tmp_data = self._tmp_io.load_form_outline()
+            self._update_progress(ProgressStatus.FORM_OUTLINE,
+                                  ps.GetFormOutlineStatus.GET_OUTLINE, 0, None)
+
             # 取得開始日時を設定
             for i, form_id in enumerate(ids):
                 query = f"?form_id={form_id}"
@@ -700,20 +739,18 @@ class JobcanDataIntegrator:
 
                 # 取得開始時刻を記録し、データ取得開始
                 last_access = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
-                form_outline_data = self._get_basic_data_with_API(
-                    APIType.REQUEST_OUTLINE,
-                    query=query,
-                    sub_count=i+1,
-                    sub_total_count=len(ids)
-                )
-                succeeded &= form_outline_data['success']
+                f_outline = self._get_form_outline_data_with_API(query=query,
+                                                                 sub_count=i+1,
+                                                                 sub_total_count=len(ids))
+                succeeded &= f_outline.success
 
                 # 申請書データ (概要) を一時ファイルに保存
-                tmp_data[form_id] = {
-                    'success': form_outline_data['success'],
-                    'ids': [res['id'] for res in form_outline_data['results']],
-                    'lastAccess': last_access
-                }
+                # 成否にかかわらず、取得したデータは一時ファイルに保存
+                tmp_data[form_id].add_ids(f_outline.ids)
+                if f_outline.success:
+                    # 今回の更新に成功した場合、成否フラグと最終アクセス日時を更新
+                    tmp_data[form_id].success = True
+                    tmp_data[form_id].last_access = last_access
                 # NOTE: 新規記録対象が10000件程度でも保存にかかる時間は0.1s程度のため、毎回直接保存する
                 self._tmp_io.save_form_outline(tmp_data)
 
