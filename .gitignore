@@ -17,3 +17,6 @@ experiments/
 
 # Resources
 *.pptx
+
+# Config Editor GUI
+editor-status
