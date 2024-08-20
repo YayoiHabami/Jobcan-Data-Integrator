@@ -5,5 +5,10 @@ win11toast
 
 # Config Editor
 
+# Config Editor GUI
+customtkinter
+CTkMessagebox
+pillow
+
 # Test (If you want to run the tests)
 # pytest
