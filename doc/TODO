@@ -66,6 +66,12 @@ integrator:
             ✔ トークン認証失敗時に、`sys.exit`を投げないようにする (`._init_token`) @done(24-08-18 15:27)
             ✔ 同上 (`.update_token) ⇒ `bool`を返すようにし、それを受け取った側で処理を行う @done(24-08-18 15:31)
             ✔ DB接続失敗時に、`sys.exit`を投げないようにする (`._init_connection`) @done(24-08-18 15:28)
+            ☐ 接続エラー`requests.exceptions.ConnectionError`が発生した場合の処理を追加する
+                ☐ `JobcanDataIntegrator._fetch_xxx`の戻り値を`"success"`からJDIErrorインスタンスorNoneに変更
+                ☐ エラーの場合、前回と今回の進捗を合成する
+                ☐ エラーの場合、`.cancel`してreturnする
+                ☐ `.restart`メソッドを追加する
+                ☐ `app.py`側で接続エラーの場合の処理を追加する
             ☐ テーブルを正常に作成できているかの確認を追加 (`._init_tables`)
         完了時処理:
             ✔ `JobcanDataIntegrator.update_progress`について、`ProgressStatus.TERMINATING`である場合の処理を追加 (他の値の`None`を許容) @done(24-08-16 16:05)
@@ -82,17 +88,18 @@ integrator:
             ✔ 各formの更新要素の取得に失敗した場合、その旨をapp_statusに記録する @done(24-08-20 15:30)
                 ✔ 一つでも取得ミスがあればその取得は失敗となるよう`._fetch_form_outline_data`を変更する @done(24-08-20 15:20)
                 ✔ 取得に失敗した場合、一時ファイルへの保存時に"success"はFalseとし、"lastAccess"を更新しないようにする @done(24-08-20 15:25)
+            ☐ `&completed_after=lastAccess&status=canceled_after_completion`である要素を取得するようにする
             ☐ `._update_form_outline`の`._update_progress`をまとめる
             ☐ `._update_form_outline`の`.config.app_status.progress.add_specifics`をまとめる
         FORM_DETAIL:
-            ☐ 一時ファイルへの保存
-                ☐ 申請書データの取得の成功ごとに一時ファイルからrequest_idを削除する
+            ✔ 一時ファイルへの保存 @done(24-08-20 22:03)
+                ✔ 申請書データの取得の成功ごとに一時ファイルからrequest_idを削除する @done(24-08-20 22:02)
                 ✔ すべてのrequest_idがなくなった場合にのみ、一時ファイルを削除する @done(24-08-19 17:58)
-            ☐ 申請書のステータスが`canceled_after_completion`,`completed`,`in_progress`,`returned`,`rejected`の5つのみであるかを確認
-            ☐ 読込対象として、一時ファイルのIDだけでなく`requests`テーブルの継続中のIDも取得する
-            ☐ 各申請書の取得に失敗した場合、その旨をapp_statusに記録する
+            ✔ 申請書のステータスが`canceled_after_completion`,`completed`,`in_progress`,`returned`,`rejected`の5つのみであるかを確認 -> `実行フロー.md` @done(24-08-20 16:22)
+            ✔ 読込対象として、一時ファイルのIDだけでなく`requests`テーブルの継続中のIDも取得する @done(24-08-20 22:03)
+            ✔ 各申請書の取得に失敗した場合、その旨をapp_statusに記録する @done(24-08-20 22:03)
             ☐ 各申請書の保存に失敗した場合、失敗した要素の`request_id`などを併せてapp_statusに記録する
-            ☐ `._update_form_detail`の最後まで進んだらapp_statusの最終更新日時を更新
+            ✔ `._update_form_detail`の最後まで進んだらapp_statusの最終更新日時を更新 @done(24-08-20 22:03)
 
 ConfigEditorGUI:
     ☐ タイトル・トップページの作成

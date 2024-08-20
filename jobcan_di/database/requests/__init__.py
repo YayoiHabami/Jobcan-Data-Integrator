@@ -21,6 +21,7 @@ Functions (sub)
 - `retrieve_viewers`: Retrieve viewers data
 - `retrieve_modify_logs`: Retrieve modify logs data
 - `retrieve_default_attachment_files`: Retrieve default attachment files data
+- `retrieve_ids`: Retrieve request IDs from `requests` table
 
 Usage
 ------
@@ -66,4 +67,4 @@ from ._approval_process import retrieve_approval_process
 from ._viewers import retrieve_viewers
 from ._modify_logs import retrieve_modify_logs
 from ._default_attachment_files import retrieve_default_attachment_files
-from ._requests import update, retrieve
+from ._requests import update, retrieve, retrieve_ids

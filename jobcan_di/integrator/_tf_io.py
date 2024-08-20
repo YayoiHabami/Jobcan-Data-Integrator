@@ -49,6 +49,16 @@ class TempFormOutline:
         """
         self.ids.update(ids)
 
+    def remove_id(self, id_: str):
+        """Remove request_id from the set
+
+        Parameters
+        ----------
+        id_ : str
+            request_id
+        """
+        self.ids.discard(id_)
+
     def asdict(self, json_format: bool = False) -> dict:
         """Convert to dictionary
 

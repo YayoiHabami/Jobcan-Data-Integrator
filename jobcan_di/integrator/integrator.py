@@ -43,6 +43,7 @@ with JobcanDataIntegrator(config) as di:
     di.run()
 ```
 """
+import copy
 import datetime
 import os
 import sqlite3
@@ -823,34 +824,67 @@ class JobcanDataIntegrator:
         # 一時ファイルの読み込み
         self._update_progress(ProgressStatus.FORM_DETAIL,
                               GetFormDetailStatus.SEEK_TARGET, 0, None)
-        request_ids = self._tmp_io.load_form_outline()
+        tmp_data = self._tmp_io.load_form_outline()
 
-        for i, item in enumerate(request_ids.items()):
+        for i, item in enumerate(tmp_data.items()):
             form_id, data = item
-            for j, request_id in enumerate(data['ids']):
+            # 取得対象のrequest_idを取得 (データはtmp_dataの増減により変動するため、コピーを作成)
+            target_ids = copy.copy(data.ids)
+            # 更新されうるデータのIDを取得 (i.e. "in_progress", "returned"; 今後の拡張に備えて以下のように記述)
+            target_ids.update(r_io.retrieve_ids(self._conn.cursor(), form_id,
+                                                ant_status = ["completed", "rejected",
+                                                              "canceled",
+                                                              "canceled_after_completion"]))
+            # 前回の取得に失敗したデータを取得対象に追加
+            failed_ids = self.config.app_status.fetch_failure_record.get(APIType.REQUEST_DETAIL,
+                                                                         form_id = form_id)
+            target_ids.update(failed_ids)
+
+            for j, request_id in enumerate(target_ids):
+                if (request_id not in failed_ids
+                    and not self._previous_progress.is_future_process(APIType.REQUEST_DETAIL,
+                                                                      specific = request_id)):
+                    # 前回の取得に失敗しておらず、前回取得済みの場合はスキップ
+                    # NOTE: .is_future_processにより、form_idとrequest_id等とが偶発的に一致した場合の判定を除外
+                    self.config.app_status.progress.add_specifics(request_id)
+                    self._update_progress(ProgressStatus.FORM_DETAIL,
+                                          ps.GetFormDetailStatus.GET_DETAIL,
+                                          1, 1, i+1, len(tmp_data)-1)
+                    continue
+
                 # 申請書データ (詳細) 取得
                 res = self._request.get(
                     self.config.api_base_url[APIType.REQUEST_DETAIL]+f"{request_id}/",
                     headers=self._headers
                 )
                 if (_code:=res.status_code) != 200:
+                    # 正常なレスポンスが返ってこなかった場合
                     self._update_progress(
                         ProgressStatus.FORM_DETAIL,
                         iw.get_form_detail_api_warning(_code, res.json(), request_id)
                     )
+                    # app_statusに取得失敗として記録
+                    self.config.app_status.fetch_failure_record.add(APIType.REQUEST_DETAIL,
+                                                                    target = request_id,
+                                                                    form_id = form_id)
                     continue
+
                 # 申請書データ (詳細) をデータベースに保存
                 self._update_data(r_io.update, res.json(), APIType.REQUEST_DETAIL)
                 self._update_progress(ProgressStatus.FORM_DETAIL,
                                       ps.get_detailed_progress_status(APIType.REQUEST_DETAIL),
-                                      j+1, len(data['ids']),
-                                      i+1, len(request_ids)-1)
+                                      j+1, len(target_ids),
+                                      i+1, len(tmp_data)-1)
 
-                # 最終更新日時を更新
-                self.config.app_status.form_api_last_access[form_id] = data['lastAccess']
+                # 一時ファイルから取得に成功したrequest_idを削除
+                tmp_data[form_id].remove_id(request_id)
+                self._tmp_io.save_form_outline(tmp_data)
 
-        self.cancel() # TODO: 未実装
-        return False
+                # app_statusに取得成功として記録
+                self.config.app_status.progress.add_specifics(request_id)
+
+            # 各form_idについて申請書(詳細)の取得が完了した場合、app_statusの最終アクセス日時を更新
+            self.config.app_status.form_api_last_access[form_id] = data.last_access
 
         return True
 
