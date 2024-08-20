@@ -71,7 +71,7 @@ from .progress_status import (
     ErrorStatus,
     APIType
 )
-from ._tf_io import JobcanTempFileIO, TempFormOutline
+from ._tf_io import JobcanTempDataIO, TempFormOutline
 from .throttled_request import ThrottledRequests
 from ._toast_notification import ToastProgressNotifier
 
@@ -127,8 +127,8 @@ class JobcanDataIntegrator:
         """全ての処理が完了したかどうか、中断された場合もFalse"""
         self._is_canceled = False
         """致命的なエラーが発生し、以降の処理を行えなくなった場合はTrue"""
-        self._tmp_io = JobcanTempFileIO(os.getcwd())
-        """一時ファイルの入出力クラス"""
+        self._tmp_io = JobcanTempDataIO(os.getcwd())
+        """一時データの入出力クラス"""
         self._current_progress = AppProgress()
         """現在の進捗状況、app_statusと異なり、失敗時にはFAILEDになる"""
         self._previous_progress = AppProgress(
