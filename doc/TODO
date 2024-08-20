@@ -41,7 +41,6 @@ integrator:
         ✔ app_status 読み込み時に "status_detail" が `TerminatingStatus.COMPLETED` である場合、`JobcanDIStatus.progress`を初期化前の状態に戻す @done(24-08-18 20:48)
         ✔ `AppProgress`に細かい進捗状況 (intかstrのリスト、終了したものを格納する) を追加する @done(24-08-19 10:53)
         ☐ `JobcanDIStatus.load`からデータの読み込み部分を分離
-    ☐ `ThrottledRequest`で`request.exceptions.ReadTimeout`が発生した場合の処理を追加する（キャッチ）
     データ取得:
         ☐ 更新中にcountが増えた場合の処理
         ☐ `null`になりえる全データについて、それがなくなった場合の処理
@@ -66,8 +65,12 @@ integrator:
             ✔ トークン認証失敗時に、`sys.exit`を投げないようにする (`._init_token`) @done(24-08-18 15:27)
             ✔ 同上 (`.update_token) ⇒ `bool`を返すようにし、それを受け取った側で処理を行う @done(24-08-18 15:31)
             ✔ DB接続失敗時に、`sys.exit`を投げないようにする (`._init_connection`) @done(24-08-18 15:28)
+            ☐ `ThrottledRequest`で`requests.exceptions.ReadTimeout`が発生した場合の処理を追加する（キャッチ）
             ☐ 接続エラー`requests.exceptions.ConnectionError`が発生した場合の処理を追加する
-                ☐ `JobcanDataIntegrator._fetch_xxx`の戻り値を`"success"`からJDIErrorインスタンスorNoneに変更
+                ✔ `JobcanDataIntegrator._fetch_xxx`の戻り値を`"success"`からJDIErrorインスタンスorNoneに変更 @done(24-08-20 23:30)
+                ☐ `._update_data`のエラー時`self._update_progress`を削除し、`JDIErrorData`を返すようにする
+                    ☐ 値を取得するすべての場所に`.cancel`を追加する
+                ☐ `._update_progress`は、`.cancel`内を除きエラーを受け取らないようにする
                 ☐ エラーの場合、前回と今回の進捗を合成する
                 ☐ エラーの場合、`.cancel`してreturnする
                 ☐ `.restart`メソッドを追加する

@@ -166,6 +166,11 @@ class ErrorStatus(DetailedProgressStatus):
     # データベース
     DATABASE_CONNECTION_FAILED = auto()
     """データベースへの接続に失敗した場合"""
+    # requests
+    REQUEST_CONNECTION_ERROR = auto()
+    """requestsでの接続に失敗した場合 (requests.exceptions.ConnectionError)"""
+    REQUEST_READ_TIMEOUT = auto()
+    """requestsでの接続がタイムアウトした場合 (requests.exceptions.ReadTimeout)"""
     # API
     API_INVALID_PARAMETER = auto()
     """APIのパラメータが不正な場合 (Status code: 400, code: 400003)"""
