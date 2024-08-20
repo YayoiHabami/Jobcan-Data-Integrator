@@ -412,7 +412,7 @@ class JobcanDataIntegrator:
         ようにしています。
         """
         if self.is_canceled or self.current_progress[0] == ProgressStatus.FAILED:
-            # キャンセルされた場合、またはエラーが発生した場合はFalse
+            # キャンセルされた場合、または現在エラー発生中であればFalse
             return False
 
         if self._previous_progress.get()[0] == ProgressStatus.FAILED:
@@ -608,6 +608,7 @@ class JobcanDataIntegrator:
                 form_id: int,
                 applied_after: Optional[str] = None,
                 skip_on_error: bool = False,
+                include_cancel: bool = True,
                 sub_count: int = 0,
                 sub_total_count: int = 0) -> TempFormOutline:
         """
@@ -625,6 +626,9 @@ class JobcanDataIntegrator:
             例) "2021/01/01 00:00:00"
         skip_on_error : bool, default False
             エラーが発生した場合にスキップするかどうか、Falseの場合は処理を終了する
+        include_cancel : bool, default True
+            取得するデータにキャンセルされたデータを含めるかどうか、APIのデフォルトはFalse
+            これをFalseにした場合、独自の申請書ID (request_id) を採用している環境での通し番号の取得はできなくなる。
         sub_count : int, default 0
             第2段階進捗に可算する値 -> _update_progress() に渡す
         sub_total_count : int, default 0
@@ -640,6 +644,8 @@ class JobcanDataIntegrator:
         query = f"?form_id={form_id}"
         if applied_after:
             query += f"&applied_after={applied_after}"
+        if include_cancel:
+            query += "&include_canceled=true"
 
         form_outline_data = self._fetch_basic_data(
             APIType.REQUEST_OUTLINE,
@@ -786,7 +792,11 @@ class JobcanDataIntegrator:
 
                 # 申請書データ (概要) を一時ファイルに保存
                 # 成否にかかわらず、取得したデータは一時ファイルに保存
-                tmp_data[form_id].add_ids(f_outline.ids)
+                if form_id not in tmp_data:
+                    tmp_data[form_id] = f_outline
+                else:
+                    tmp_data[form_id].add_ids(f_outline.ids)
+
                 if f_outline.success:
                     # 今回の更新に成功した場合、成否フラグと最終アクセス日時を更新
                     tmp_data[form_id].success = True
