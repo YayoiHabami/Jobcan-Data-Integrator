@@ -60,6 +60,7 @@ from .progress_status import (
     get_progress_status_msg,
     PROGRESS_STATUS_MSG
 )
+from .integrator_errors import JDIErrorData
 
 
 
@@ -206,7 +207,7 @@ class ToastProgressNotifier:
 
     def update(self,
                status:ProgressStatus,
-               sub_status:DetailedProgressStatus,
+               sub_status:Union[DetailedProgressStatus, JDIErrorData],
                current:int, total:Union[int,None],
                sub_count:int=0, sub_total_count:int=0):
         """進捗状況を更新する
@@ -234,7 +235,10 @@ class ToastProgressNotifier:
             return
 
         # sub_statusのメッセージを取得
-        status_msg = get_progress_status_msg(status, sub_status, sub_count, sub_total_count)
+        if isinstance(sub_status, DetailedProgressStatus):
+            status_msg = get_progress_status_msg(status, sub_status, sub_count, sub_total_count)
+        elif isinstance(sub_status, JDIErrorData):
+            status_msg = sub_status.error_message()
         if total is None:
             value = 0 if current == 0 else 1
             str_value = f"{current}/?"
