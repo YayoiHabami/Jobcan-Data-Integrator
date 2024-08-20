@@ -55,7 +55,9 @@ integrator:
             ✔ それ以外の場合、指定されたステータスから再度開始する @done(24-08-18 22:29)
             ✔ `AppProgress`の細かい進捗状況に応じて、FormOutlineの開始位置を変更する @done(24-08-19 18:22)
             ☐ `AppProgress`の細かい進捗状況に応じて、FormDetailの開始位置を変更する
+            ✔ `FetchFailureRecord`の`._basic_data`等の値を`set[str]`に変更する @done(24-08-20 11:04)
             ☐ 読み込み時に`FetchFailureRecord`が空でないAPIについて、再度処理を行うなどの処理を追加する
+                ☐ `JobcanDataIntegrator._is_future_progress`に条件分岐を追加する
             ☐ 再度開始するための`.restart`メソッドを追加する (`TerminatingStatus.COMPLETED`でなければ`.is_canceled`を`False`にして再開:`._initialize`と`.run`を実行)
         例外処理:
             ✔ (以降の処理を行わない)致命的なエラーが発生した場合に、`._is_canceled`を`True`にする @done(24-08-18 15:27)
@@ -75,12 +77,11 @@ integrator:
             ☐ positionsの取得に失敗した場合、その旨をapp_statusに記録する
             ☐ positionsの保存に失敗した場合、失敗した要素の`position_code`などを併せてapp_statusに記録する
         FORM_OUTLINE:
-            ☐ form取得に失敗した場合、その旨をapp_statusに記録する
+            ✔ form取得に失敗した場合、その旨をapp_statusに記録する (→`.app_status.fetch_failure_record`) @done(24-08-20 15:28)
             ☐ formの保存に失敗した場合、失敗した要素の`form_id`などを併せてapp_statusに記録する
-                ☐ 一つでも取得ミスがあればその取得は失敗となるよう`._get_basic_data_with_API`を変更する
-                ☐ 取得に失敗した場合、一時ファイルへの保存時に"success"はFalseとし、"lastAccess"を更新しないようにする
-                ☐ app_statusと連携する
-            ☐ 各formの更新要素の取得に失敗した場合、その旨をapp_statusに記録する
+            ✔ 各formの更新要素の取得に失敗した場合、その旨をapp_statusに記録する @done(24-08-20 15:30)
+                ✔ 一つでも取得ミスがあればその取得は失敗となるよう`._fetch_form_outline_data`を変更する @done(24-08-20 15:20)
+                ✔ 取得に失敗した場合、一時ファイルへの保存時に"success"はFalseとし、"lastAccess"を更新しないようにする @done(24-08-20 15:25)
             ☐ `._update_form_outline`の`._update_progress`をまとめる
             ☐ `._update_form_outline`の`.config.app_status.progress.add_specifics`をまとめる
         FORM_DETAIL:
