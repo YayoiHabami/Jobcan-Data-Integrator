@@ -116,6 +116,9 @@ def test_fetch_failure_record():
     record = FetchFailureRecord()
 
     # 基本データの追加と取得のテスト
+    assert record.is_failed(APIType.GROUP_V1) is False
+    record.is_failed(APIType.GROUP_V1, True)
+    assert record.is_failed(APIType.GROUP_V1) is True
     record.add(APIType.USER_V3, "123")
     assert record.get(APIType.USER_V3) == {"123"}
 
@@ -136,6 +139,7 @@ def test_fetch_failure_record():
         'request_detail': {789: {'456', '789'}}
     }
     expected_dict["basic_data"][APIType.USER_V3.name] = {'123'}
+    expected_dict["basic_data"][APIType.GROUP_V1.name] = {""}
     print(expected_dict)
     print(record.asdict())
     assert record.asdict() == expected_dict

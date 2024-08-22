@@ -19,7 +19,7 @@ Notes
 """
 import json
 from os import path, makedirs
-from typing import Dict, Optional, Union, Tuple, Set, Iterable
+from typing import Dict, Optional, Union, Tuple, Set, Iterable, Literal
 
 from .progress_status import (
     ProgressStatus, DetailedProgressStatus, TerminatingStatus,
@@ -253,9 +253,24 @@ class AppProgress:
         return po.value > self._outline.value
 
 
+class FailureRecord:
+    """各API関連の処理についてなんらかの失敗があった対象を保持するクラス
 
-class FetchFailureRecord:
-    """APIでデータ取得に失敗した対象を保持するクラス"""
+    Notes
+    -----
+    以下のように辞書型との相互変換が可能
+
+    ```python
+    record = FailureRecord()
+    record.add(APIType.USER_V3, "123")
+    record.add(APIType.REQUEST_DETAIL, "456", form_id=789)
+    record.asdict()
+    # -> {'basic_data': {"USER_V3": ['123']}, 'request_detail': {789: ['456']}}
+    record2 = FailureRecord(**record.asdict())
+    record2.asdict()
+    # -> {'basic_data': {"USER_V3": ['123']}, 'request_detail': {789: ['456']}}
+    ```
+    """
 
     def __init__(
             self,
@@ -267,29 +282,14 @@ class FetchFailureRecord:
         Parameters
         ----------
         basic_data : Dict[str, set[str]], optional
-            申請書(詳細)を除いた、基本データの取得に失敗した対象、
+            申請書(詳細)を除いた、処理に失敗した基本データ、
             JSON形式からの復元のため、辞書の値がリストであることを許容
         request_detail : Dict[int, set[str]], optional
             申請書(詳細)の取得に失敗した対象、
             JSON形式からの復元のためにキーが文字列であることと、辞書の値がリストであることを許容
-
-        Notes
-        -----
-        以下のように辞書型との相互変換が可能
-
-        ```python
-        record = FetchFailureRecord()
-        record.add(APIType.USER_V3, "123")
-        record.add(APIType.REQUEST_DETAIL, "456", form_id=789)
-        record.asdict()
-        # -> {'basic_data': {"USER_V3": ['123']}, 'request_detail': {789: ['456']}}
-        record2 = FetchFailureRecord(**record.asdict())
-        record2.asdict()
-        # -> {'basic_data': {"USER_V3": ['123']}, 'request_detail': {789: ['456']}}
-        ```
         """
         self._basic_data: Dict[APIType, set[str]] = {}
-        """申請書(詳細)を除いた、基本データの取得に失敗した対象"""
+        """申請書(詳細)を除いた、処理に失敗した基本データ"""
         self._request_detail: Dict[int, set[str]] = {}
         """申請書(詳細)の取得に失敗した対象、キーはform_id、値は取得に失敗したrequest_id"""
 
@@ -309,16 +309,17 @@ class FetchFailureRecord:
                 self._request_detail[int(form_id)] = set(targets)
 
     def add(self, api_type:APIType, target:str, *, form_id:Optional[int]=None) -> None:
-        """データ取得に失敗した対象を追加する
+        """処理に失敗した対象を追加する
 
         Parameters
         ----------
         api_type : APIType
-            取得に失敗したAPIの種類
+            処理に失敗した対象のAPIの種類
         target : str
-            取得に失敗した対象のID
+            処理に失敗した対象のID
+            例) form_outline であれば form_id
         form_id : int, optional
-            取得に失敗した申請書のID、api_type が REQUEST_DETAIL の場合のみ指定
+            処理に失敗した申請書のID、api_type が REQUEST_DETAIL の場合のみ指定
         """
         if api_type == APIType.REQUEST_DETAIL:
             if form_id is None:
@@ -330,19 +331,19 @@ class FetchFailureRecord:
             self._basic_data[api_type].add(target)
 
     def get(self, api_type:APIType, *, form_id:Optional[int]=None) -> set[str]:
-        """データ取得に失敗した対象を取得する
+        """処理に失敗した対象を取得する
 
         Parameters
         ----------
         api_type : APIType
-            取得に失敗したAPIの種類
+            処理に失敗した対象のAPIの種類
         form_id : int, optional
-            取得に失敗した申請書のID、api_type が REQUEST_DETAIL の場合のみ指定
+            処理に失敗した申請書のID、api_type が REQUEST_DETAIL の場合のみ指定
 
         Returns
         -------
         set[str]
-            取得に失敗した対象のID
+            処理に失敗した対象のID
         """
         if api_type == APIType.REQUEST_DETAIL:
             if form_id is None:
@@ -352,12 +353,12 @@ class FetchFailureRecord:
             return self._basic_data.get(api_type, set())
 
     def get_request_detail(self) -> Dict[int, set[str]]:
-        """申請書(詳細)の取得に失敗した対象を取得する
+        """処理に失敗した申請書(詳細)のform_id,request_idを取得する
 
         Returns
         -------
         Dict[int, set[str]]
-            取得に失敗したform_idと、その申請書に対して取得に失敗したrequest_idの辞書
+            処理に失敗したform_idと、処理に失敗した (その申請書に対応した) request_idの辞書
         """
         return self._request_detail
 
@@ -403,6 +404,123 @@ class FetchFailureRecord:
         }
 
 
+class DBSaveFailureRecord(FailureRecord):
+    """DB操作に失敗した対象を保持するクラス
+
+    Notes
+    -----
+    - 以下のように辞書型との相互変換が可能
+
+    ```python
+    record = DBSaveFailureRecord()
+    record.add(APIType.USER_V3, "123")
+    record.add(APIType.REQUEST_DETAIL, "456", form_id=789)
+    record.asdict()
+    # -> {'basic_data': {"USER_V3": ['123']}, 'request_detail': {789: ['456']}}
+    record2 = DBSaveFailureRecord(**record.asdict())
+    record2.asdict()
+    # -> {'basic_data': {"USER_V3": ['123']}, 'request_detail': {789: ['456']}}
+    ```
+
+    - `is_failed()` メソッドを使用することで、指定されたAPIでのDB操作に失敗したかどうかを判定できる
+
+    ```python
+    record = DBSaveFailureRecord()
+    # USER_V3 APIでのDB操作を失敗として記録
+    record.is_failed(APIType.USER_V3, True)
+
+    # USER_V3 APIでのDB操作が失敗したかどうかを取得
+    record.is_failed(APIType.USER_V3)
+    # -> True
+    ```
+    """
+    def is_failed(
+            self,
+            api_type:Literal[APIType.USER_V3, APIType.GROUP_V1, APIType.POSITION_V1],
+            value: Optional[bool] = None
+        ) -> bool:
+        """指定されたAPIでのDB操作に失敗したかどうか
+        `value`を指定した場合、DB操作に失敗/成功したとして記録する
+
+        Parameters
+        ----------
+        api_type : APIType
+            APIの種類
+        value : bool, optional
+            失敗した場合はTrue、成功した場合はFalse
+
+        Returns
+        -------
+        bool
+            指定されたAPIでのDB操作に失敗した場合はTrue
+        """
+        if value is not None:
+            if value:
+                self.add(api_type, "")
+            else:
+                self._basic_data[api_type] = set()
+        return bool(self._basic_data[api_type])
+
+
+class FetchFailureRecord(FailureRecord):
+    """APIでデータ取得に失敗した対象を保持するクラス
+
+    Notes
+    -----
+    - 以下のように辞書型との相互変換が可能
+
+    ```python
+    record = FetchFailureRecord()
+    record.add(APIType.USER_V3, "123")
+    record.add(APIType.REQUEST_DETAIL, "456", form_id=789)
+    record.asdict()
+    # -> {'basic_data': {"USER_V3": ['123']}, 'request_detail': {789: ['456']}}
+    record2 = FetchFailureRecord(**record.asdict())
+    record2.asdict()
+    # -> {'basic_data': {"USER_V3": ['123']}, 'request_detail': {789: ['456']}}
+    ```
+
+    - `is_failed()` メソッドを使用することで、指定されたAPIでのデータ取得に失敗したかどうかを判定できる
+
+    ```python
+    record = FetchFailureRecord()
+    # USER_V3 APIでのデータ取得を失敗として記録
+    record.is_failed(APIType.USER_V3, True)
+
+    # USER_V3 APIでのデータ取得が失敗したかどうかを取得
+    record.is_failed(APIType.USER_V3)
+    # -> True
+    ```
+    """
+    def is_failed(
+            self,
+            apy_type:Literal[APIType.USER_V3, APIType.GROUP_V1,
+                             APIType.POSITION_V1, APIType.FORM_V1],
+            value: Optional[bool] = None
+        ) -> bool:
+        """指定されたAPIでのデータ取得に失敗したかどうか
+        valueが指定されている場合は、そのAPIでのデータ取得に失敗/成功したとして記録する
+
+        Parameters
+        ----------
+        apy_type : APIType
+            APIの種類
+        value : bool, optional
+            失敗した場合はTrue、成功した場合はFalse
+
+        Returns
+        -------
+        bool
+            指定されたAPIでのデータ取得に失敗した場合はTrue
+        """
+        if value is not None:
+            if value:
+                self.add(apy_type, "")
+            else:
+                self._basic_data[apy_type] = set()
+        return bool(self._basic_data[apy_type])
+
+
 class JobcanDIStatus:
     """Jobcan Data Integrator クラスのステータス管理クラス
 
@@ -440,6 +558,8 @@ class JobcanDIStatus:
         self.progress = AppProgress(outline = ProgressStatus.INITIALIZING,
                                     detail = None)
         """前回/現在の進捗状況"""
+        self.db_save_failure_record = DBSaveFailureRecord()
+        """DBへの保存に失敗した対象"""
         self.fetch_failure_record = FetchFailureRecord()
         """データ取得に失敗した対象"""
         self.config_file_path = ""
@@ -451,6 +571,7 @@ class JobcanDIStatus:
         """ステータスを初期化する"""
         self.progress = AppProgress(outline = ProgressStatus.INITIALIZING,
                                     detail = None)
+        self.db_save_failure_record.clear()
         self.fetch_failure_record.clear()
         self.config_file_path = ""
         self.form_api_last_access = {}
@@ -504,6 +625,15 @@ class JobcanDIStatus:
                                         detail = p_detail,
                                         specifics=p_specifics)
 
+        # DBへの保存に失敗した対象の読み込み
+        try:
+            # "db_save_failure_record" が存在する場合のみ読み込む
+            if "db_save_failure_record" in data:
+                self.db_save_failure_record = DBSaveFailureRecord(**data["db_save_failure_record"])
+        except TypeError:
+            # データ型が不正な場合はデータを読み込まない
+            pass
+
         # データ取得に失敗した対象の読み込み
         try:
             # "fetch_failure_record" が存在する場合のみ読み込む
@@ -526,6 +656,7 @@ class JobcanDIStatus:
         with open(self._file_path, "w", encoding="utf-8") as f:
             json.dump({
                 "progress": self.progress.asdict(json_format=True),
+                "db_save_failure_record": self.db_save_failure_record.asdict(json_format=True),
                 "fetch_failure_record": self.fetch_failure_record.asdict(json_format=True),
                 "config_file_path": self.config_file_path,
                 "form_api_last_access": self.form_api_last_access

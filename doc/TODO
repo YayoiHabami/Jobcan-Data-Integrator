@@ -19,6 +19,7 @@ DB構造(いずれも変更時は`データベース構造.md`を編集のこと
 integrator:
     ☐ `config.ini`が削除されても復帰可能なように、データを保持するソースとかを追加する
     ✔ `.update_progress`と`.logger`を統合して隠蔽する @done(24-08-16 21:21)
+    ✔ `_update_basic_data`などを分割、`._run`内で呼び出す @done(24-08-22 10:29)
     ☐ キャンセル時にapp_statusを保存するべきか検証する
     非同期処理:
         ☐ `JobcanDataIntegrator` の `._initialize` の各処理を非同期処理に変更する
@@ -56,6 +57,7 @@ integrator:
             ☐ `AppProgress`の細かい進捗状況に応じて、FormDetailの開始位置を変更する
             ✔ `FetchFailureRecord`の`._basic_data`等の値を`set[str]`に変更する @done(24-08-20 11:04)
             ☐ 読み込み時に`FetchFailureRecord`が空でないAPIについて、再度処理を行うなどの処理を追加する
+                ☐ basic_dataについて処理を追加する
                 ☐ `JobcanDataIntegrator._is_future_progress`に条件分岐を追加する
             ☐ 再度開始するための`.restart`メソッドを追加する (`TerminatingStatus.COMPLETED`でなければ`.is_canceled`を`False`にして再開:`._initialize`と`.run`を実行)
         例外処理:
@@ -65,29 +67,35 @@ integrator:
             ✔ トークン認証失敗時に、`sys.exit`を投げないようにする (`._init_token`) @done(24-08-18 15:27)
             ✔ 同上 (`.update_token) ⇒ `bool`を返すようにし、それを受け取った側で処理を行う @done(24-08-18 15:31)
             ✔ DB接続失敗時に、`sys.exit`を投げないようにする (`._init_connection`) @done(24-08-18 15:28)
-            ☐ `ThrottledRequest`で`requests.exceptions.ReadTimeout`が発生した場合の処理を追加する（キャッチ）
-            ☐ 接続エラー`requests.exceptions.ConnectionError`が発生した場合の処理を追加する
+            ✔ `ThrottledRequest`で`requests.exceptions.ReadTimeout`が発生した場合の処理を追加する（キャッチ） @done(24-08-22 10:31)
+            ✔ 接続エラー`requests.exceptions.ConnectionError`が発生した場合の処理を追加する @done(24-08-22 10:31)
                 ✔ `JobcanDataIntegrator._fetch_xxx`の戻り値を`"success"`からJDIErrorインスタンスorNoneに変更 @done(24-08-20 23:30)
-                ☐ `._update_data`のエラー時`self._update_progress`を削除し、`JDIErrorData`を返すようにする
-                    ☐ 値を取得するすべての場所に`.cancel`を追加する
-                ☐ `._update_progress`は、`.cancel`内を除きエラーを受け取らないようにする
+                ✔ `._update_data`のエラー時`self._update_progress`を削除し、`JDIErrorData`を返すようにする @done(24-08-21 10:35)
+                    ✔ 失敗したデータを保存する`FailureRecord`を追加する @done(24-08-21 19:51)
+                    ✔ app_statusにDB関連エラー`DBSaveFailureRecord`を追加する @done(24-08-21 19:51)
+                    ✔ 値を取得するすべての場所に`.cancel`を追加する @done(24-08-22 10:30)
+                ✔ `._update_progress`は、`.cancel`内を除きエラーを受け取らないようにする @done(24-08-22 10:12)
                 ☐ エラーの場合、前回と今回の進捗を合成する
                 ☐ エラーの場合、`.cancel`してreturnする
                 ☐ `.restart`メソッドを追加する
                 ☐ `app.py`側で接続エラーの場合の処理を追加する
+            ☐ `UnknownError`に、エラーの詳細(traceback)を保存する
+                ☐ そのほか詳細が欲しいエラーについても同様 (APIレスポンス保存時KeyErrorとかSQLエラー)
+            ☐ `._update_data`でKeyError等JSON変換エラーをキャッチする (warning)
             ☐ テーブルを正常に作成できているかの確認を追加 (`._init_tables`)
+            ☐ 最終的にエラーメッセージと対処法へのリンクを張る。対処法はdocにmarkdownで記述する。クラッシュした際などに、その実行で発生したエラー等と解決策をまとめたcrash-report.htmlを出力したい。
         完了時処理:
             ✔ `JobcanDataIntegrator.update_progress`について、`ProgressStatus.TERMINATING`である場合の処理を追加 (他の値の`None`を許容) @done(24-08-16 16:05)
         BASIC_DATA:
-            ☐ users取得に失敗した場合、その旨をapp_statusに記録する
-            ☐ usersの保存に失敗した場合、失敗した要素の`user_code`などを併せてapp_statusに記録する
-            ☐ groupsの取得に失敗した場合、その旨をapp_statusに記録する
-            ☐ groupsの保存に失敗した場合、失敗した要素の`group_code`などを併せてapp_statusに記録する
-            ☐ positionsの取得に失敗した場合、その旨をapp_statusに記録する
-            ☐ positionsの保存に失敗した場合、失敗した要素の`position_code`などを併せてapp_statusに記録する
+            ✔ users取得に失敗した場合、その旨をapp_statusに記録する @done(24-08-22 10:27)
+            ✔ usersの保存に失敗した場合、失敗した要素の`user_code`などを併せてapp_statusに記録する @done(24-08-22 10:27)
+            ✔ groupsの取得に失敗した場合、その旨をapp_statusに記録する @done(24-08-22 10:27)
+            ✔ groupsの保存に失敗した場合、失敗した要素の`group_code`などを併せてapp_statusに記録する @done(24-08-22 10:27)
+            ✔ positionsの取得に失敗した場合、その旨をapp_statusに記録する @done(24-08-22 10:27)
+            ✔ positionsの保存に失敗した場合、失敗した要素の`position_code`などを併せてapp_statusに記録する @done(24-08-22 10:27)
         FORM_OUTLINE:
             ✔ form取得に失敗した場合、その旨をapp_statusに記録する (→`.app_status.fetch_failure_record`) @done(24-08-20 15:28)
-            ☐ formの保存に失敗した場合、失敗した要素の`form_id`などを併せてapp_statusに記録する
+            ✔ formの保存に失敗した場合、失敗した要素の`form_id`などを併せてapp_statusに記録する @done(24-08-22 10:26)
             ✔ 各formの更新要素の取得に失敗した場合、その旨をapp_statusに記録する @done(24-08-20 15:30)
                 ✔ 一つでも取得ミスがあればその取得は失敗となるよう`._fetch_form_outline_data`を変更する @done(24-08-20 15:20)
                 ✔ 取得に失敗した場合、一時ファイルへの保存時に"success"はFalseとし、"lastAccess"を更新しないようにする @done(24-08-20 15:25)
@@ -101,7 +109,7 @@ integrator:
             ✔ 申請書のステータスが`canceled_after_completion`,`completed`,`in_progress`,`returned`,`rejected`の5つのみであるかを確認 -> `実行フロー.md` @done(24-08-20 16:22)
             ✔ 読込対象として、一時ファイルのIDだけでなく`requests`テーブルの継続中のIDも取得する @done(24-08-20 22:03)
             ✔ 各申請書の取得に失敗した場合、その旨をapp_statusに記録する @done(24-08-20 22:03)
-            ☐ 各申請書の保存に失敗した場合、失敗した要素の`request_id`などを併せてapp_statusに記録する
+            ✔ 各申請書の保存に失敗した場合、失敗した要素の`request_id`などを併せてapp_statusに記録する @done(24-08-22 10:26)
             ✔ `._update_form_detail`の最後まで進んだらapp_statusの最終更新日時を更新 @done(24-08-20 22:03)
 
 ConfigEditorGUI:
