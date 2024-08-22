@@ -26,6 +26,7 @@ from .progress_status import (
     APIType, get_detailed_progress_status_from_str,
     get_progress_status, get_detailed_progress_status
 )
+from .integrator_errors import JDIErrorData, from_json as error_from_json
 
 
 
@@ -225,7 +226,6 @@ class AppProgress:
           以下のように判定する
           - `specific`が`.specifics`に含まれている場合: `False` (処理済)
           - それ以外: `True` (未処理/処理中)
-        - 現在の進捗状況がエラーであるか、`progress`がエラーである場合は常に`False`を返す
         """
         if isinstance(progress, APIType):
             po = get_progress_status(progress)
@@ -233,10 +233,7 @@ class AppProgress:
         else:
             po, pd = progress
 
-        if self._outline == ProgressStatus.FAILED or po == ProgressStatus.FAILED:
-            # 現在の進捗状況がエラーであるか、progressがエラーである場合は常にFalse
-            return False
-        elif po == self._outline:
+        if po == self._outline:
             # 進捗状況(概要)が同じ
             if pd == self._detail:
                 # 進捗状況(詳細)が同じ
@@ -558,6 +555,8 @@ class JobcanDIStatus:
         self.progress = AppProgress(outline = ProgressStatus.INITIALIZING,
                                     detail = None)
         """前回/現在の進捗状況"""
+        self.current_error: Optional[JDIErrorData] = None
+        """現在のエラー情報、エラーが発生していない場合はNone"""
         self.db_save_failure_record = DBSaveFailureRecord()
         """DBへの保存に失敗した対象"""
         self.fetch_failure_record = FetchFailureRecord()
@@ -625,6 +624,10 @@ class JobcanDIStatus:
                                         detail = p_detail,
                                         specifics=p_specifics)
 
+        # 現在のエラー情報の読み込み
+        if (ce := data.get("current_error", None)) is not None:
+            self.current_error = error_from_json(ce["name"], ce["data"])
+
         # DBへの保存に失敗した対象の読み込み
         try:
             # "db_save_failure_record" が存在する場合のみ読み込む
@@ -653,11 +656,30 @@ class JobcanDIStatus:
 
     def save(self) -> None:
         """ステータスファイルに保存する"""
+        current_error = None
+        if self.current_error is not None:
+            current_error = {
+                "name": self.current_error.name,
+                "data": self.current_error.asdict()
+            }
+
         with open(self._file_path, "w", encoding="utf-8") as f:
             json.dump({
                 "progress": self.progress.asdict(json_format=True),
+                "current_error": current_error,
                 "db_save_failure_record": self.db_save_failure_record.asdict(json_format=True),
                 "fetch_failure_record": self.fetch_failure_record.asdict(json_format=True),
                 "config_file_path": self.config_file_path,
                 "form_api_last_access": self.form_api_last_access
             }, f)
+
+    @property
+    def has_error(self) -> bool:
+        """エラーが発生しているかどうか
+
+        Returns
+        -------
+        bool
+            エラーが発生している場合はTrue
+        """
+        return self.current_error is not None

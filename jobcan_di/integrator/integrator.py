@@ -72,7 +72,6 @@ from .progress_status import (
     InitializingStatus,
     GetFormDetailStatus,
     TerminatingStatus,
-    ErrorStatus,
     APIType
 )
 from ._tf_io import JobcanTempDataIO, TempFormOutline
@@ -144,8 +143,10 @@ class JobcanDataIntegrator:
     ----------
     progress : Tuple[ProgressStatus, DetailedProgressStatus]
         進捗状況を取得する（致命的なエラーが発生した場合はエラー発生時の進捗状況を返す）
-    current_progress : Tuple[ProgressStatus, DetailedProgressStatus]
-        現在の進捗状況を取得する（致命的なエラーが発生した場合はエラーの詳細を返す）
+    current_error : Optional[ie.JDIErrorData]
+        現在のエラー情報を取得する、エラーが発生していない場合はNone
+    has_error : bool
+        エラーが発生しているかどうか
     is_canceled : bool
         処理がキャンセルされたかどうか
     is_completed : bool
@@ -179,8 +180,6 @@ class JobcanDataIntegrator:
         """致命的なエラーが発生し、以降の処理を行えなくなった場合はTrue"""
         self._tmp_io = JobcanTempDataIO(os.getcwd())
         """一時データの入出力クラス"""
-        self._current_progress = AppProgress()
-        """現在の進捗状況、app_statusと異なり、失敗時にはFAILEDになる"""
         self._previous_progress = AppProgress(
             **self.config.app_status.progress.asdict()
         )
@@ -366,7 +365,7 @@ class JobcanDataIntegrator:
     def _update_progress(
             self,
             status:ProgressStatus,
-            sub_status:Union[DetailedProgressStatus, ie.JDIErrorData, iw.JDIWarningData],
+            sub_status:DetailedProgressStatus,
             current:int=0, total:Union[int,None]=None,
             sub_count:int=0, sub_total_count:int=0
         ) -> None:
@@ -376,7 +375,7 @@ class JobcanDataIntegrator:
         ----------
         status : ProgressStatus
             大枠の進捗状況
-        sub_status : DetailedProgressStatus | JDIWarningData | JDIErrorData
+        sub_status : DetailedProgressStatus
             細かい進捗状況、InitializingStatusなど
         current : int
             現在の進捗
@@ -392,26 +391,13 @@ class JobcanDataIntegrator:
 
         Notes
         -----
-        - 本メソッドでは更新内容が通知/警告/エラーに関わらずログ・通知を更新しますが、
-          基本的には以下のようなルールで本メソッドを呼び出すことを想定しています。
+        - 本メソッドでは基本的には以下のようなルールで本メソッドを呼び出すことを想定しています。
           - 通常の進捗更新: `ProgressStatus` と `DetailedProgressStatus` を指定
             - 進捗が生じた直後に本メソッドを呼び出す
-          - 警告: `ProgressStatus` と `JDIWarningData` を指定
-            - 警告の原因のエラーが発生した直後に本メソッドを呼び出す
-          - エラー: `ProgressStatus.FAILED` と `JDIErrorData` を指定
-            - 続行不可能なエラーが生じた場合に、`.cancel`に`JDIErrorData`を渡し、間接的に呼び出す
-            - 基本的に続行不可能なエラーが生じた場合は、終了処理が必要なため
         """
         # ログメッセージを取得
-        if isinstance(sub_status, ie.JDIErrorData):
-            level = LogLevel.ERROR
-            message = sub_status.error_message()
-        elif isinstance(sub_status, iw.JDIWarningData):
-            level = LogLevel.WARNING
-            message = sub_status.warning_message()
-        else:
-            level = LogLevel.ERROR if isinstance(sub_status, ErrorStatus) else LogLevel.INFO
-            message = ps.get_progress_status_msg(status, sub_status, sub_count, sub_total_count)
+        level = LogLevel.INFO
+        message = ps.get_progress_status_msg(status, sub_status, sub_count, sub_total_count)
 
         # ログ出力
         self._logger.log(status, message, level)
@@ -421,29 +407,54 @@ class JobcanDataIntegrator:
             self._notifier.notify(title=self.app_id, body=message, level=level)
 
         # 通知を更新
-        if (level == LogLevel.INFO
-            or (level == LogLevel.ERROR and self.config.clear_progress_on_error)):
-            self._notifier.update(
-                status,
-                sub_status.status if isinstance(sub_status, ie.JDIErrorData) else sub_status,
-                current, total, sub_count, sub_total_count
-            )
+        self._notifier.update(status, sub_status, current, total, sub_count, sub_total_count)
 
-        # 進捗状況を更新
-        if isinstance(sub_status, DetailedProgressStatus):
-            # 進捗状況を更新
-            self._current_progress.set(status, sub_status)
-        elif isinstance(sub_status, ie.JDIErrorData):
-            # エラーの場合は進捗状況をFAILEDにして更新
-            self._current_progress.set(ProgressStatus.FAILED, sub_status.status)
-        elif isinstance(sub_status, iw.JDIWarningData):
+        # app_status側の進捗状況を更新・保存
+        self.config.app_status.progress.set(status, sub_status)
+
+        self.save_status()
+
+    def _update_issue(self, issue:Union[ie.JDIErrorData, iw.JDIWarningData]):
+        """エラー/警告情報を更新する
+
+        Parameters
+        ----------
+        issue : Union[ie.JDIErrorData, iw.JDIWarningData]
+            エラー/警告情報
+
+        Notes
+        -----
+        - エラー/警告情報を更新し、ログ・通知を更新する
+        - 警告: `JDIWarningData` を指定
+            - 警告の原因のエラーが発生した直後に本メソッドを呼び出す
+        - エラー: `JDIErrorData` を指定
+            - 続行不可能なエラーが生じた場合に、`.cancel`に`JDIErrorData`を渡し、間接的に呼び出す
+            - 基本的に続行不可能なエラーが生じた場合は、終了処理が必要なため
+        """
+        if isinstance(issue, ie.JDIErrorData):
+            level = LogLevel.ERROR
+            message = issue.error_message()
+            # エラーの場合は現在のエラー情報を更新
+            self.config.app_status.current_error = issue
+        else:
+            level = LogLevel.WARNING
+            message = issue.warning_message()
             # 警告の場合はログに記録
-            self._issued_warnings.append(sub_status)
+            self._issued_warnings.append(issue)
 
-        if (status != ProgressStatus.FAILED) and (isinstance(sub_status, DetailedProgressStatus)):
-            # 失敗以外の場合、app_status側の進捗状況を更新・保存
-            self.config.app_status.progress.set(status, sub_status)
-            self.save_status()
+        # ログ出力
+        status = self.config.app_status.progress.get()[0]
+        self._logger.log(status, message, level)
+
+        # トースト通知
+        if self.config.notify_log_level <= level.value:
+            self._notifier.notify(title=self.app_id, body=message, level=level)
+
+        # 通知を更新
+        if level == LogLevel.ERROR and self.config.clear_progress_on_error:
+            self._notifier.update(status, issue, 0, 1)
+
+        self.save_status()
 
     def save_status(self):
         """アプリケーションの状態を保存する"""
@@ -470,13 +481,10 @@ class JobcanDataIntegrator:
         また、一応、前回の進捗状況がエラーの場合は`True`を返す (前回エラーの場合は最初から実行する)
         ようにしています。
         """
-        if self.is_canceled or self.current_progress[0] == ProgressStatus.FAILED:
+        if self.is_canceled or self.config.app_status.has_error:
             # キャンセルされた場合、または現在エラー発生中であればFalse
             return False
 
-        if self._previous_progress.get()[0] == ProgressStatus.FAILED:
-            # 前回の進捗状況がエラーの場合はTrue (一応)
-            return True
         # 前回の進捗状況がapi_typeよりも未来のものの場合はFalse
         return self._previous_progress.is_future_process(api_type)
 
@@ -492,31 +500,24 @@ class JobcanDataIntegrator:
         -------
         Tuple[ProgressStatus, DetailedProgressStatus]
             進捗状況
-
-        Notes
-        -----
-        - `.current_progress` とは異なり、致命的なエラーが発生した場合は
-          発生時の進捗状況を返す。
-          - 例) `GetFormOutlineStatus.Get_OUTLINE` でエラーが発生した場合、
-            `ProgressStatus.FORM_OUTLINE` と `GetFormOutlineStatus.Get_OUTLINE` を返す
         """
         return self.config.app_status.progress.get()
 
     @property
-    def current_progress(self) -> Tuple[ProgressStatus, DetailedProgressStatus]:
-        """現在の進捗状況を取得する
+    def current_error(self) -> Optional[ie.JDIErrorData]:
+        """現在のエラー情報を取得する
 
         Returns
         -------
-        Tuple[ProgressStatus, DetailedProgressStatus]
-            現在の進捗状況
-
-        Notes
-        -----
-        - `.progress` とは異なり、致命的なエラーが発生した場合は
-          `ProgressStatus.FAILED`と `ErrorStatus` を返す
+        Optional[ie.JDIErrorData]
+            エラー情報、エラーが発生していない場合はNone
         """
-        return self._current_progress.get()
+        return self.config.app_status.current_error
+
+    @property
+    def has_error(self) -> bool:
+        """エラーが発生しているかどうか"""
+        return self.config.app_status.has_error
 
     @property
     def is_canceled(self) -> bool:
@@ -547,14 +548,15 @@ class JobcanDataIntegrator:
 
         Notes
         -----
-        - FAILEDとして`._update_progress()`を呼び出す
+        - `._update_issue()`を呼び出す
         """
-        # TODO: 前回と今回の進捗状況の統合
+        # TODO: 前回 (_previous_progress) と今回 (app_status) の進捗状況の統合
+        # 統合したものをapp_statusのprogressとして更新・保存する
 
         self._is_canceled = True
         self._completed = False
 
-        self._update_progress(ProgressStatus.FAILED, error)
+        self._update_issue(error)
 
     def _run(self):
         """メイン処理"""
@@ -584,16 +586,38 @@ class JobcanDataIntegrator:
         -----
         - `CATCH_ERRORS_ON_RUN`が`True`の場合、エラーが発生してもアプリケーションが終了しない"""
         if not self.config.catch_errors_on_run:
-            # デバッグ用: エラーをキャッチしない
+            # デバッグ用: 想定外のエラー(UNEXPECTED_ERROR)をキャッチしない
             return self._run()
 
         # 本番用: エラーをキャッチしてアプリケーションの終了を防ぐ
         try:
             self._run()
         except Exception as e:
-            self._update_progress(ProgressStatus.FAILED, ie.UnexpectedError(e))
-            self._completed = False
+            self.cancel(ie.UnexpectedError(e))
             return
+
+    def restart(self):
+        """処理を再開する"""
+        # キャンセルフラグをリセット
+        # エラーが発生している場合 (ProgressStatus.FAILED) は
+
+        # previous_progressをリセット
+
+    def cleanup(self):
+        """終了処理"""
+        # データベースとの接続を閉じる
+        if self._conn:
+            self._conn.close()
+
+        # 全処理が正常に完了した場合、一時ファイルを削除
+        if self._completed:
+            self._tmp_io.cleanup()
+
+        self.save_status()
+
+    #
+    # 内部処理 (データ取得・更新等)
+    #
 
     def _fetch_data(self, url:str, api_type:APIType) -> APIResponse:
         """APIを使用してデータを取得する
@@ -616,7 +640,7 @@ class JobcanDataIntegrator:
             if res.status_code != 200:
                 # 正常なレスポンスが返ってこなかった場合
                 warning = iw.get_api_error(api_type, res.status_code, res, url)
-                self._update_progress(ps.get_progress_status(api_type), warning)
+                self._update_issue(warning)
                 return APIResponse(error=warning)
 
             # 正常なレスポンスが返ってきた場合
@@ -814,7 +838,7 @@ class JobcanDataIntegrator:
             update_func(self._conn, data)
         except sqlite3.Error as e:
             warning = iw.DBUpdateFailed(api_type, e)
-            self._update_progress(ps.get_progress_status(api_type), warning)
+            self._update_issue(warning)
             return warning
 
         # 更新が正常に終了
@@ -1004,15 +1028,3 @@ class JobcanDataIntegrator:
             self.config.app_status.form_api_last_access[form_id] = data.last_access
 
         return True
-
-    def cleanup(self):
-        """終了処理"""
-        # データベースとの接続を閉じる
-        if self._conn:
-            self._conn.close()
-
-        # 全処理が正常に完了した場合、一時ファイルを削除
-        if self._completed:
-            self._tmp_io.cleanup()
-
-        self.save_status()

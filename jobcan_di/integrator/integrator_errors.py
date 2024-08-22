@@ -9,6 +9,7 @@ Classes
 - `TokenMissingEnvNotFound` : 指定された環境変数が存在しない場合のエラー情報
 - `TokenInvalid` : トークンが無効な場合のエラー情報
 - `DatabaseConnectionFailed` : データベースへの接続に失敗した場合のエラー情報
+- `ApiRequestErrorData` : APIエラー情報 (抽象クラス)
 - `ApiInvalidParameterError` : APIのパラメータが不正な場合のエラー情報
 - `ApiCommonIdSyncFailedError` : APIの共通IDとの連携に失敗した場合のエラー情報
 - `ApiDataNotFoundError` : APIのデータが見つからない場合のエラー情報
@@ -18,11 +19,13 @@ Classes
 Functions
 ---------
 - `get_api_error` : APIエラー情報の取得
+- `from_json` : JSONからエラー情報を生成
 """
 from abc import ABCMeta, abstractmethod
-from typing import Optional, Union
+from copy import deepcopy
+from typing import Optional, Union, Dict
 
-from .progress_status import ErrorStatus, API_TYPE_NAME, APIType
+from .progress_status import API_TYPE_NAME, APIType
 
 
 
@@ -32,7 +35,83 @@ from .progress_status import ErrorStatus, API_TYPE_NAME, APIType
 
 class JDIErrorData(metaclass=ABCMeta):
     """エラー情報"""
-    status: ErrorStatus = ErrorStatus.UNKNOWN_ERROR
+    def __init__(self, e:Union[Exception, str, dict, None]=None):
+        """コンストラクタ
+
+        Parameters
+        ----------
+        e : Exception | str | dict | None
+            例外、またはエラーメッセージ
+            dict の場合はエラー詳細を格納した辞書
+        """
+        self._details: dict = {}
+
+        if e is None:
+            # e が None の場合はエラー情報を空にする
+            return
+
+        if isinstance(e, str):
+            e_name = "UnexpectedError"
+            e_args = e
+        elif isinstance(e, Exception):
+            e_name = e.__class__.__name__
+            e_args = e.args[0] if e.args else ""
+        elif isinstance(e, dict):
+            e_name = e.get("exception_name", "UnexpectedError")
+            e_args = e.get("args", "")
+            self._details = e
+
+        self._details["e"] = {
+            "exception_name": e_name,
+            "args": e_args
+        }
+
+    @property
+    def exception_name(self) -> Optional[str]:
+        """例外名
+
+        Returns
+        -------
+        str
+            例外名
+        """
+        if "e" not in self._details:
+            return None
+        return self._details["e"]["exception_name"]
+
+    @property
+    def args(self) -> Optional[str]:
+        """例外の引数
+
+        Returns
+        -------
+        str
+            例外の引数
+        """
+        if "e" not in self._details:
+            return None
+        return self._details["e"]["args"]
+
+    @property
+    def name(self) -> str:
+        """エラー名
+
+        Returns
+        -------
+        str
+            エラー名
+        """
+        return self.__class__.__name__
+
+    def asdict(self) -> dict:
+        """エラー情報を辞書形式で取得
+
+        Returns
+        -------
+        dict
+            エラー情報
+        """
+        return deepcopy(self._details)
 
     @abstractmethod
     def error_message(self) -> str:
@@ -46,32 +125,13 @@ class JDIErrorData(metaclass=ABCMeta):
 
 class UnexpectedError(JDIErrorData):
     """未知のエラーが発生した場合のエラー情報"""
-    status = ErrorStatus.UNKNOWN_ERROR
-
-    def __init__(self, e:Union[Exception, str, None]):
-        """未知のエラーが発生した場合のエラー情報
-
-        Parameters
-        ----------
-        e : Exception | str | None
-            例外、またはエラーメッセージ
-        """
-        if isinstance(e, str):
-            self._exception_name = "UnexpectedError"
-            self._args = e
-        elif isinstance(e, Exception):
-            self._exception_name = e.__class__.__name__
-            self._args = e.args[0] if e.args else ""
-        else:
-            self._exception_name = None
-            self._args = None
 
     def error_message(self) -> str:
-        if self._exception_name is None:
+        if self.exception_name is None:
             return "未知のエラーが発生しました。"
 
         return "以下のエラーが発生しました: " \
-               f"{self._exception_name}: {self._args}"
+               f"{self.exception_name}: {self.args}"
 
 
 
@@ -81,17 +141,13 @@ class UnexpectedError(JDIErrorData):
 
 class TokenMissingEnvEmpty(JDIErrorData):
     """トークン取得先の環境変数名が指定されていない場合のエラー情報"""
-    status = ErrorStatus.TOKEN_MISSING_ENV_EMPTY
-
     def error_message(self) -> str:
         return "コンフィグにトークン取得先の環境変数名が指定されていません。" \
                "TOKEN_ENV_NAME を指定するか、API_TOKEN にトークンを指定して下さい。"
 
 class TokenMissingEnvNotFound(JDIErrorData):
     """指定された環境変数が存在しない場合のエラー情報"""
-    status = ErrorStatus.TOKEN_MISSING_ENV_NOT_FOUND
-
-    def __init__(self, env_name:str):
+    def __init__(self, env_name:str, e:Union[Exception, str, dict, None]=None):
         """指定された環境変数が存在しない場合のエラー情報
 
         Parameters
@@ -99,17 +155,16 @@ class TokenMissingEnvNotFound(JDIErrorData):
         env_name : str
             トークン保存先の環境変数名
         """
-        self._env_name = env_name
+        super().__init__(e)
+        self._details["env_name"] = env_name
 
     def error_message(self) -> str:
-        return f"指定された環境変数 {self._env_name} が存在しません。" \
+        return f"指定された環境変数 {self._details['env_name']} が存在しません。" \
                "TOKEN_ENV_NAME を修正するか、API_TOKEN にトークンを指定して下さい。"
 
 class TokenInvalid(JDIErrorData):
     """トークンが無効な場合のエラー情報"""
-    status = ErrorStatus.TOKEN_INVALID
-
-    def __init__(self, token:str):
+    def __init__(self, token:str, e:Union[Exception, str, dict, None]=None):
         """トークンが無効な場合のエラー情報
 
         Parameters
@@ -117,12 +172,13 @@ class TokenInvalid(JDIErrorData):
         token : str
             トークン
         """
-        self._token = token[:3] + "*"*len(token[3:])
+        super().__init__(e)
+        self._details["token"] = token[:3] + "*"*len(token[3:])
         """トークン (一部マスク)"""
 
     def error_message(self) -> str:
         return f"指定されたトークンが無効です。" \
-               f"設定を確認してください (トークン: {self._token})"
+               f"設定を確認してください (トークン: {self._details['token']})"
 
 
 
@@ -132,23 +188,11 @@ class TokenInvalid(JDIErrorData):
 
 class DatabaseConnectionFailed(JDIErrorData):
     """データベースへの接続に失敗した場合のエラー情報"""
-    status = ErrorStatus.DATABASE_CONNECTION_FAILED
-
-    def __init__(self, e:Optional[Exception]=None):
-        """データベースへの接続に失敗した場合のエラー情報
-
-        Parameters
-        ----------
-        e : Optional[Exception], default None
-            例外
-        """
-        self._exception_name = e.__class__.__name__ if e else ""
-        self._args = e.args[0] if e and e.args else ""
 
     def error_message(self) -> str:
-        if self._exception_name:
+        if self.exception_name:
             return f"データベースへの接続に失敗しました: " \
-                   f"{self._exception_name}: {self._args}"
+                   f"{self.exception_name}: {self.args}"
         else:
             return "データベースへの接続に失敗しました。"
 
@@ -161,72 +205,116 @@ class DatabaseConnectionFailed(JDIErrorData):
 class RequestConnectionError(JDIErrorData):
     """リクエストの接続に失敗した場合のエラー情報
     (requests.exceptions.ConnectionError)"""
-    status = ErrorStatus.REQUEST_CONNECTION_ERROR
-
-    def __init__(self, e:Exception):
-        """リクエストの接続に失敗した場合のエラー情報
-
-        Parameters
-        ----------
-        e : Exception
-            例外
-        """
-        self._exception_name = e.__class__.__name__
-        self._args = e.args[0] if e.args else ""
 
     def error_message(self) -> str:
-        return f"接続に失敗しました: {self._exception_name}: {self._args}"
+        return f"接続に失敗しました: {self.exception_name}: {self.args}"
 
 class RequestReadTimeout(JDIErrorData):
     """リクエストの読み込みがタイムアウトした場合のエラー情報
     (requests.exceptions.ReadTimeout)"""
-    status = ErrorStatus.REQUEST_READ_TIMEOUT
-
-    def __init__(self, e:Exception):
-        """リクエストの読み込みがタイムアウトした場合のエラー情報
-
-        Parameters
-        ----------
-        e : Exception
-            例外
-        """
-        self._exception_name = e.__class__.__name__
-        self._args = e.args[0] if e.args else ""
 
     def error_message(self) -> str:
-        return f"読み込みがタイムアウトしました: {self._exception_name}: {self._args}"
+        return f"読み込みがタイムアウトしました: {self.exception_name}: {self.args}"
 
 
 #
 # API
 #
 
-class ApiInvalidParameterError(JDIErrorData):
-    """APIのパラメータが不正な場合のエラー情報"""
-    status = ErrorStatus.API_INVALID_PARAMETER
+class ApiRequestErrorData(JDIErrorData):
+    """
+    APIエラー情報 (抽象クラス)
 
-    def __init__(self, api_type:APIType, response:dict):
-        """APIのパラメータが不正な場合のエラー情報
+    Attributes
+    ----------
+    api_type : APIType
+        APIの種類
+    api_name : str
+        APIの名前
+    """
+    def __init__(self,
+                 api_type:Union[APIType, str],
+                 e:Union[Exception, str, dict, None]=None):
+        """APIエラー情報 (抽象クラス)
 
         Parameters
         ----------
         api_type : APIType
             APIの種類
-        response : dict
-            APIのレスポンス
+        e : Exception | str | dict | None
+            例外、またはエラーメッセージ
+            dict の場合はエラー詳細を格納した辞書
         """
-        self._api_name = API_TYPE_NAME[api_type]
-        self._detail = " / ".join(response.get("detail", []))
+        super().__init__(e)
+        self._details["api_type"] = api_type if isinstance(api_type, str) else api_type.name
+
+    @property
+    def api_type(self) -> APIType:
+        """APIの種類
+
+        Returns
+        -------
+        APIType
+            APIの種類
+        """
+        return APIType[self._details["api_type"]]
+
+    @property
+    def api_name(self) -> str:
+        """APIの名前
+
+        Returns
+        -------
+        str
+            APIの名前
+        """
+        return API_TYPE_NAME[self.api_type]
+
+    @abstractmethod
+    def error_message(self) -> str:
+        """エラー情報
+
+        Returns
+        -------
+        str
+            エラーメッセージ
+        """
+
+class ApiInvalidParameterError(ApiRequestErrorData):
+    """APIのパラメータが不正な場合のエラー情報 (Status code: 400, code: 400003)"""
+    def __init__(self,
+                 api_type:Union[APIType, str],
+                 response:Union[dict, str],
+                 e:Union[Exception, str, dict, None]=None):
+        """APIのパラメータが不正な場合のエラー情報
+
+        Parameters
+        ----------
+        api_type : APIType | str
+            APIの種類
+        response : dict | str
+            APIのレスポンス
+            str の場合はレスポンスを結合した文字列 (JSONとの変換用)
+        e : Exception | str | dict | None
+            例外、またはエラーメッセージ
+            dict の場合はエラー詳細を格納した辞書
+        """
+        super().__init__(api_type, e)
+        if isinstance(response, dict):
+            self._details["response"] = " / ".join(response.get("detail", []))
+        else:
+            self._details["response"] = response
 
     def error_message(self) -> str:
-        return f"{self._api_name} の取得に失敗しました。" \
-               f"パラメータが不正です (ステータスコード 400): {self._detail} "
+        return f"{self.api_name} の取得に失敗しました。" \
+               f"パラメータが不正です (ステータスコード 400): {self._details['response']} "
 
-class ApiInvalidJsonFormatError(JDIErrorData):
-    """APIのJSONの形式が不正な場合のエラー情報"""
-    status = ErrorStatus.API_INVALID_JSON_FORMAT
-
-    def __init__(self, api_type:APIType, response:dict):
+class ApiInvalidJsonFormatError(ApiRequestErrorData):
+    """APIのJSONの形式が不正な場合のエラー情報 (Status code: 400, code: 400100)"""
+    def __init__(self,
+                 api_type:Union[APIType, str],
+                 response:Union[dict, str],
+                 e:Union[Exception, str, dict, None]=None):
         """APIのJSONの形式が不正な場合のエラー情報
 
         Parameters
@@ -235,37 +323,33 @@ class ApiInvalidJsonFormatError(JDIErrorData):
             APIの種類
         response : dict
             APIのレスポンス
+            str の場合はレスポンスを結合した文字列 (JSONとの変換用)
+        e : Exception | str | dict | None
+            例外、またはエラーメッセージ
+            dict の場合はエラー詳細を格納した辞書
         """
-        self._api_name = API_TYPE_NAME[api_type]
-        self._detail = " / ".join(response.get("message", []))
+        super().__init__(api_type, e)
+        if isinstance(response, dict):
+            self._details["response"] = " / ".join(response.get("message", []))
+        else:
+            self._details["response"] = response
 
     def error_message(self) -> str:
-        return f"{self._api_name} の取得に失敗しました。" \
-               f"JSONの形式が不正です (ステータスコード 400): {self._detail}"
+        return f"{self.api_name} の取得に失敗しました。" \
+               f"JSONの形式が不正です (ステータスコード 400): {self._details['response']}"
 
-class ApiCommonIdSyncFailedError(JDIErrorData):
-    """APIの共通IDとの連携に失敗した場合のエラー情報"""
-    status = ErrorStatus.API_COMMON_ID_SYNC_FAILED
-
-    def __init__(self, api_type:APIType):
-        """APIの共通IDとの連携に失敗した場合のエラー情報
-
-        Parameters
-        ----------
-        api_type : APIType
-            APIの種類
-        """
-        self._api_name = API_TYPE_NAME[api_type]
-
+class ApiCommonIdSyncFailedError(ApiRequestErrorData):
+    """APIの共通IDとの連携に失敗した場合のエラー情報 (Status code: 400, code: 400900)"""
     def error_message(self) -> str:
-        return f"{self._api_name} の取得に失敗しました。" \
+        return f"{self.api_name} の取得に失敗しました。" \
                f"共通IDとの連携に失敗しました (ステータスコード 400)"
 
-class ApiDataNotFoundError(JDIErrorData):
-    """APIのデータが見つからない場合のエラー情報"""
-    status = ErrorStatus.API_DATA_NOT_FOUND
-
-    def __init__(self, api_type:APIType, target:str):
+class ApiDataNotFoundError(ApiRequestErrorData):
+    """APIのデータが見つからない場合のエラー情報 (Status code: 404)"""
+    def __init__(self,
+                 api_type:Union[APIType, str],
+                 target:str,
+                 e:Union[Exception, str, dict, None]=None):
         """APIのデータが見つからない場合のエラー情報
 
         Parameters
@@ -274,30 +358,21 @@ class ApiDataNotFoundError(JDIErrorData):
             APIの種類
         target : str
             対象 (クエリ文字列など)
+        e : Exception | str | dict | None
+            例外、またはエラーメッセージ
+            dict の場合はエラー詳細を格納した辞書
         """
-        self._api_name = API_TYPE_NAME[api_type]
-        self._target = target
+        super().__init__(api_type, e)
+        self._details["target"] = target
 
     def error_message(self) -> str:
-        return f"{self._api_name} の取得に失敗しました。" \
-               f"対象のデータが見つかりません (ステータスコード 404; ターゲット:{self._target})"
+        return f"{self.api_name} の取得に失敗しました。" \
+               f"対象のデータが見つかりません (ステータスコード 404; ターゲット:{self._details['target']})"
 
-class ApiUnexpectedError(JDIErrorData):
-    """APIの予期しないエラーが発生した場合のエラー情報"""
-    status = ErrorStatus.API_UNEXPECTED_ERROR
-
-    def __init__(self, api_type:APIType):
-        """APIの予期しないエラーが発生した場合のエラー情報
-
-        Parameters
-        ----------
-        api_type : APIType
-            APIの種類
-        """
-        self._api_name = API_TYPE_NAME[api_type]
-
+class ApiUnexpectedError(ApiRequestErrorData):
+    """APIの予期しないエラーが発生した場合のエラー情報 (Status code: 500)"""
     def error_message(self) -> str:
-        return f"{self._api_name} の取得に失敗しました。" \
+        return f"{self.api_name} の取得に失敗しました。" \
                f"予期しないエラーが発生しました (ステータスコード 500)"
 
 def get_api_error(api_type:APIType,
@@ -337,3 +412,44 @@ def get_api_error(api_type:APIType,
         return ApiUnexpectedError(api_type)
 
     return UnexpectedError(f"APIによるデータ取得時に不明なエラーが発生しました (ステータスコード {status_code})")
+
+
+#
+# JSONとの変換
+#
+
+_class_registry: Dict[str, JDIErrorData] = {
+    "TokenMissingEnvEmpty": TokenMissingEnvEmpty,
+    "TokenMissingEnvNotFound": TokenMissingEnvNotFound,
+    "TokenInvalid": TokenInvalid,
+    "DatabaseConnectionFailed": DatabaseConnectionFailed,
+    "RequestConnectionError": RequestConnectionError,
+    "RequestReadTimeout": RequestReadTimeout,
+    "ApiInvalidParameterError": ApiInvalidParameterError,
+    "ApiInvalidJsonFormatError": ApiInvalidJsonFormatError,
+    "ApiCommonIdSyncFailedError": ApiCommonIdSyncFailedError,
+    "ApiDataNotFoundError": ApiDataNotFoundError,
+    "ApiUnexpectedError": ApiUnexpectedError,
+    "UnexpectedError": UnexpectedError
+}
+"""エラークラスの登録 (JSONとの変換用)"""
+
+def from_json(name:str, kwargs:dict) -> JDIErrorData:
+    """JSONからエラー情報を生成
+
+    Parameters
+    ----------
+    name : str
+        エラークラス名
+    kwargs : dict
+        エラー情報
+        JDIErrorData.asdict() で取得した辞書
+
+    Returns
+    -------
+    JDIErrorData
+        エラー情報
+    """
+    if name not in _class_registry:
+        return UnexpectedError(f"Invalid warning class name: {name}")
+    return _class_registry[name](**kwargs)

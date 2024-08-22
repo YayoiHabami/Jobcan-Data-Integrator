@@ -17,7 +17,6 @@ Classes
 - `GetFormOutlineStatus`: 進捗状況 (ProgressStatus.FORM_OUTLINE)
 - `GetFormDetailStatus`: 進捗状況 (ProgressStatus.FORM_DETAIL)
 - `TerminatingStatus`: 進捗状況 (ProgressStatus.TERMINATING)
-- `ErrorStatus`: エラー
 - `APIType`: APIの種類
 
 Constants
@@ -52,8 +51,6 @@ class ProgressStatus(Enum):
     FORM_DETAIL = auto()
     # 終了処理
     TERMINATING = auto()
-    # データの取得失敗
-    FAILED = -1
 MAX_STATUS_LENGTH = max([len(s.name) for s in ProgressStatus])
 
 # 進捗状況メッセージ
@@ -63,8 +60,7 @@ PROGRESS_STATUS_MSG = {
     ProgressStatus.BASIC_DATA: f"基本データ取得中... (STEP 2/{_cnt})",
     ProgressStatus.FORM_OUTLINE: f"申請書データ (概要) 取得中... (STEP 3/{_cnt})",
     ProgressStatus.FORM_DETAIL: f"申請書データ (詳細) 取得中... (STEP 4/{_cnt})",
-    ProgressStatus.TERMINATING: f"終了処理中... (STEP 5/{_cnt})",
-    ProgressStatus.FAILED: "更新に失敗しました"
+    ProgressStatus.TERMINATING: f"終了処理中... (STEP 5/{_cnt})"
 }
 
 class DetailedProgressStatus(Enum):
@@ -154,37 +150,6 @@ TERMINATING_STATUS_MSG = {
     TerminatingStatus.COMPLETED: f"すべての処理が完了しました (3/{_cnt})",
 }
 
-class ErrorStatus(DetailedProgressStatus):
-    """エラー"""
-    # トークン
-    TOKEN_MISSING_ENV_EMPTY = auto()
-    """トークンが指定されず、指定された環境変数が空の場合"""
-    TOKEN_MISSING_ENV_NOT_FOUND = auto()
-    """トークンが指定されず、指定された環境変数が存在しない場合"""
-    TOKEN_INVALID = auto()
-    """トークンが不正な場合"""
-    # データベース
-    DATABASE_CONNECTION_FAILED = auto()
-    """データベースへの接続に失敗した場合"""
-    # requests
-    REQUEST_CONNECTION_ERROR = auto()
-    """requestsでの接続に失敗した場合 (requests.exceptions.ConnectionError)"""
-    REQUEST_READ_TIMEOUT = auto()
-    """requestsでの接続がタイムアウトした場合 (requests.exceptions.ReadTimeout)"""
-    # API
-    API_INVALID_PARAMETER = auto()
-    """APIのパラメータが不正な場合 (Status code: 400, code: 400003)"""
-    API_INVALID_JSON_FORMAT = auto()
-    """リクエストのJSONの形式が不正な場合 (Status code: 400, code: 400100)"""
-    API_COMMON_ID_SYNC_FAILED = auto()
-    """共通IDとの連携に失敗した場合 (Status code: 400, code: 400900)"""
-    API_DATA_NOT_FOUND = auto()
-    """対象のデータが見つからない場合 (Status code: 404)"""
-    API_UNEXPECTED_ERROR = auto()
-    """予期しないエラーが発生した場合 (Status code: 500)"""
-    # その他
-    UNKNOWN_ERROR = auto()
-    """未知のエラーが発生した場合"""
 
 # ProgressStatusと各進捗状況に対応するメッセージを取得
 def get_progress_status_msg(status:ProgressStatus, sub_status:DetailedProgressStatus,
@@ -217,8 +182,6 @@ def get_progress_status_msg(status:ProgressStatus, sub_status:DetailedProgressSt
             )
     elif status == ProgressStatus.TERMINATING:
         return TERMINATING_STATUS_MSG[sub_status]
-    elif status == ProgressStatus.FAILED:
-        return "更新に失敗しました"
     return ""
 
 def get_detailed_progress_status_from_str(
@@ -247,7 +210,9 @@ def get_detailed_progress_status_from_str(
         return GetFormDetailStatus[sub_status]
     elif status == ProgressStatus.TERMINATING.name:
         return TerminatingStatus[sub_status]
-    return ErrorStatus.UNKNOWN_ERROR
+
+    # 指定された進捗状況が存在しない場合
+    raise ValueError(f"Invalid status: {status} / {sub_status}")
 
 
 #

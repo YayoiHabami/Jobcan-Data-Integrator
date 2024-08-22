@@ -11,6 +11,7 @@ Classes
 - `InvalidConfigFilePath` : コンフィグファイルのパスが不正な場合の警告情報
 - `InvalidStatusFilePath` : ステータスファイルのパスが不正な場合の警告情報
 - `InvalidLogFilePath` : ログファイルのパスが不正な場合の警告情報
+- `ApiRequestWarningData` : API警告情報 (抽象クラス)
 - `ApiInvalidParameterWarning` : APIのパラメータが不正な場合の警告情報
 - `ApiInvalidJsonFormatWarning` : APIのJSONの形式が不正な場合の警告情報
 - `ApiCommonIdSyncFailedWarning` : APIの共通IDとの連携に失敗した場合の警告情報
@@ -27,51 +28,88 @@ Functions
 - `get_form_detail_api_warning` : 申請書データ (詳細) のAPIの警告情報を取得
 """
 from abc import ABCMeta, abstractmethod
-from enum import Enum, auto
-from typing import Optional, Union
+from copy import deepcopy
+from typing import Optional, Union, Dict
 
 from .progress_status import APIType, API_TYPE_NAME
 
 
 
-class JDIWarning(Enum):
-    """警告"""
-    # ファイルパス
-    INVALID_CONFIG_FILE_PATH = auto()
-    """指定されたコンフィグファイルのパスが不正な場合"""
-    INVALID_STATUS_FILE_PATH = auto()
-    """指定されたステータスファイル (app_status) のパスが不正な場合"""
-    INVALID_LOG_FILE_PATH = auto()
-    """指定されたログファイルのパスが不正な場合"""
-    # API (general)
-    API_INVALID_PARAMETER = auto()
-    """APIのパラメータが不正な場合 (Status code: 400, code: 400003)"""
-    API_INVALID_JSON_FORMAT = auto()
-    """リクエストのJSONの形式が不正な場合 (Status code: 400, code: 400100)"""
-    API_COMMON_ID_SYNC_FAILED = auto()
-    """共通IDとの連携に失敗した場合 (Status code: 400, code: 400900)"""
-    API_DATA_NOT_FOUND = auto()
-    """対象のデータが見つからない場合 (Status code: 404)"""
-    API_UNEXPECTED_ERROR = auto()
-    """予期しないエラーが発生した場合 (Status code: 500)"""
-    # API (form_detail)
-    FORM_DETAIL_API_INVALID_PARAMETER = auto()
-    """申請書データ (詳細) のAPIのパラメータが不正な場合"""
-    FORM_DETAIL_API_API_DATA_NOT_FOUND = auto()
-    """指定された申請書データ (詳細) が見つからない場合"""
-    FORM_DETAIL_API_UNEXPECTED_ERROR = auto()
-    """申請書データ (詳細) のAPIで予期しないエラーが発生した場合"""
-    # DB
-    DB_UPDATE_FAILED = auto()
-    """DBのデータ更新に失敗した場合"""
-    # その他
-    UNEXPECTED_ERROR = auto()
-    """予期しないエラーが発生した場合"""
-
-
 class JDIWarningData(metaclass=ABCMeta):
     """警告情報"""
-    status: JDIWarning = JDIWarning.INVALID_CONFIG_FILE_PATH
+    def __init__(self, e:Union[Exception, str, dict, None]=None):
+        """コンストラクタ
+
+        Parameters
+        ----------
+        e : Exception | str | dict | None
+            例外、エラーメッセージ、エラー情報
+            dictの場合は、エラー情報を格納した辞書
+        """
+        self.details: dict = {}
+
+        if isinstance(e, str):
+            e_name = "UnexpectedError"
+            e_args = e
+        elif isinstance(e, Exception):
+            e_name = e.__class__.__name__
+            e_args = e.args[0] if e.args else ""
+        elif isinstance(e, dict):
+            e_name = e.get("exception_name", "UnexpectedError")
+            e_args = e.get("args", "")
+            self._details = e
+
+        self._details["e"] = {
+            "exception_name": e_name,
+            "args": e_args
+        }
+
+    @property
+    def exception_name(self) -> Optional[str]:
+        """例外名
+
+        Returns
+        -------
+        str
+            例外名
+        """
+        if "e" not in self._details:
+            return None
+        return self._details["e"]["exception_name"]
+
+    @property
+    def args(self) -> Optional[str]:
+        """例外の引数
+
+        Returns
+        -------
+        str
+            例外の引数
+        """
+        if "e" not in self._details:
+            return None
+        return self._details["e"]["args"]
+
+    @property
+    def name(self) -> str:
+        """エラー名
+
+        Returns
+        -------
+        str
+            エラー名
+        """
+        return self.__class__.__name__
+
+    def asdict(self) -> dict:
+        """エラー情報を辞書形式で取得
+
+        Returns
+        -------
+        dict
+            エラー情報
+        """
+        return deepcopy(self._details)
 
     @abstractmethod
     def warning_message(self) -> str:
@@ -85,32 +123,12 @@ class JDIWarningData(metaclass=ABCMeta):
 
 class UnexpectedWarning(JDIWarningData):
     """予期しないエラーが発生した場合の警告情報"""
-    status = JDIWarning.UNEXPECTED_ERROR
-
-    def __init__(self, e:Union[Exception, str, None]):
-        """予期しないエラーが発生した場合の警告情報
-
-        Parameters
-        ----------
-        e : Exception | str | None
-            例外、またはエラーメッセージ
-        """
-        if isinstance(e, str):
-            self._exception_name = "UnexpectedError"
-            self._args = e
-        elif isinstance(e, Exception):
-            self._exception_name = e.__class__.__name__
-            self._args = e.args[0] if e.args else ""
-        else:
-            self._exception_name = None
-            self._args = None
-
     def warning_message(self) -> str:
-        if self._exception_name is None:
+        if self.exception_name is None:
             return "予期しないエラーが発生しました。"
 
         return f"予期しないエラーが発生しました。" \
-                f"例外: {self._exception_name} - {self._args}"
+                f"例外: {self.exception_name} - {self.args}"
 
 
 
@@ -120,56 +138,62 @@ class UnexpectedWarning(JDIWarningData):
 
 class InvalidConfigFilePath(JDIWarningData):
     """指定されたコンフィグファイルのパスが不正な場合の警告情報"""
-    status = JDIWarning.INVALID_CONFIG_FILE_PATH
-
-    def __init__(self, file_path:str):
+    def __init__(self, file_path:str, e:Union[Exception, str, dict, None]=None):
         """指定されたコンフィグファイルのパスが不正な場合の警告情報
 
         Parameters
         ----------
         file_path : str
             コンフィグファイルのパス
+        e : Exception | str | dict | None
+            例外、エラーメッセージ、エラー情報
+            dictの場合は、エラー情報を格納した辞書
         """
-        self._file_path = file_path
+        super().__init__(e)
+        self._details["file_path"] = file_path
 
     def warning_message(self) -> str:
-        return f"指定されたコンフィグファイルのパス ({self._file_path}) が不正です。" \
+        return f"指定されたコンフィグファイルのパス ({self._details['file_path']}) が不正です。" \
                "デフォルトのコンフィグファイルを使用します。"
 
 class InvalidStatusFilePath(JDIWarningData):
     """指定されたステータスファイルのパスが不正な場合の警告情報"""
-    status = JDIWarning.INVALID_STATUS_FILE_PATH
-
-    def __init__(self, file_path:str):
+    def __init__(self, file_path:str, e:Union[Exception, str, dict, None]=None):
         """指定されたステータスファイルのパスが不正な場合の警告情報
 
         Parameters
         ----------
         file_path : str
             ステータスファイルのパス
+        e : Exception | str | dict | None
+            例外、エラーメッセージ、エラー情報
+            dictの場合は、エラー情報を格納した辞書
         """
-        self._file_path = file_path
+        super().__init__(e)
+        self._details["file_path"] = file_path
 
     def warning_message(self) -> str:
-        return f"指定されたステータスファイルのパス ({self._file_path}) が不正です。" \
+        return f"指定されたステータスファイルのパス ({self._details['file_path']}) が不正です。" \
                "デフォルトのファイルを使用します。"
 
 class InvalidLogFilePath(JDIWarningData):
     """指定されたログファイルのパスが不正な場合の警告情報"""
-    status = JDIWarning.INVALID_LOG_FILE_PATH
-
-    def __init__(self, file_path:str):
+    def __init__(self, file_path:str, e:Union[Exception, str, dict, None]=None):
         """指定されたログファイルのパスが不正な場合の警告情報
 
         Parameters
         ----------
         file_path : str
             ログファイルのパス
+        e : Exception | str | dict | None
+            例外、エラーメッセージ、エラー情報
+            dictの場合は、エラー情報を格納した辞書
         """
-        self._file_path = file_path
+        super().__init__(e)
+        self._details["file_path"] = file_path
 
     def warning_message(self) -> str:
-        return f"指定されたログファイルのパス ({self._file_path}) が不正です。" \
+        return f"指定されたログファイルのパス ({self._details['file_path']}) が不正です。" \
                "デフォルトのログファイルを使用します。"
 
 
@@ -178,11 +202,71 @@ class InvalidLogFilePath(JDIWarningData):
 # API (general)
 #
 
-class ApiInvalidParameterWarning(JDIWarningData):
-    """APIのパラメータが不正な場合の警告情報"""
-    status = JDIWarning.API_INVALID_PARAMETER
+class ApiRequestWarningData(JDIWarningData):
+    """
+    API警告情報 (抽象クラス)
 
-    def __init__(self, api_type:APIType, response:dict):
+    Attributes
+    ----------
+    api_type : APIType
+        APIの種類
+    api_name : str
+        APIの名前
+    """
+    def __init__(self,
+                 api_type:Union[APIType, str],
+                 e:Union[Exception, str, dict, None]=None):
+        """APIエラー情報 (抽象クラス)
+
+        Parameters
+        ----------
+        api_type : APIType
+            APIの種類
+        e : Exception | str | dict | None
+            例外、またはエラーメッセージ
+            dict の場合はエラー詳細を格納した辞書
+        """
+        super().__init__(e)
+        self._details["api_type"] = api_type if isinstance(api_type, str) else api_type.name
+
+    @property
+    def api_type(self) -> APIType:
+        """APIの種類
+
+        Returns
+        -------
+        APIType
+            APIの種類
+        """
+        return APIType[self._details["api_type"]]
+
+    @property
+    def api_name(self) -> str:
+        """APIの名前
+
+        Returns
+        -------
+        str
+            APIの名前
+        """
+        return API_TYPE_NAME[self.api_type]
+
+    @abstractmethod
+    def warning_message(self) -> str:
+        """警告メッセージの取得
+
+        Returns
+        -------
+        str
+            警告メッセージ
+        """
+
+class ApiInvalidParameterWarning(ApiRequestWarningData):
+    """APIのパラメータが不正な場合の警告情報 (Status code: 400, code: 400003)"""
+    def __init__(self,
+                 api_type:Union[APIType, str],
+                 response:Union[dict, str],
+                 e:Union[Exception, str, dict, None]=None):
         """APIのパラメータが不正な場合の警告情報
 
         Parameters
@@ -192,18 +276,22 @@ class ApiInvalidParameterWarning(JDIWarningData):
         response : dict
             APIのレスポンス
         """
-        self._api_name = API_TYPE_NAME[api_type]
-        self._detail = " / ".join(response.get("detail", []))
+        super().__init__(api_type, e)
+        if isinstance(response, dict):
+            self._details["response"] = " / ".join(response.get("detail", []))
+        else:
+            self._details["response"] = response
 
     def warning_message(self) -> str:
-        return f"{self._api_name} の取得に失敗しました。" \
-               f"パラメータが不正です (ステータスコード 400): {self._detail} "
+        return f"{self.api_name} の取得に失敗しました。" \
+               f"パラメータが不正です (ステータスコード 400): {self._details['response']} "
 
-class ApiInvalidJsonFormatWarning(JDIWarningData):
-    """APIのJSONの形式が不正な場合の警告情報"""
-    status = JDIWarning.API_INVALID_JSON_FORMAT
-
-    def __init__(self, api_type:APIType, response:dict):
+class ApiInvalidJsonFormatWarning(ApiRequestWarningData):
+    """APIのJSONの形式が不正な場合の警告情報 (Status code: 400, code: 400100)"""
+    def __init__(self,
+                 api_type:Union[APIType, str],
+                 response:Union[dict, str],
+                 e:Union[Exception, str, dict, None]=None):
         """APIのJSONの形式が不正な場合の警告情報
 
         Parameters
@@ -213,36 +301,28 @@ class ApiInvalidJsonFormatWarning(JDIWarningData):
         response : dict
             APIのレスポンス
         """
-        self._api_name = API_TYPE_NAME[api_type]
-        self._detail = " / ".join(response.get("message", []))
+        super().__init__(api_type, e)
+        if isinstance(response, dict):
+            self._details["response"] = " / ".join(response.get("message", []))
+        else:
+            self._details["response"] = response
 
     def warning_message(self) -> str:
-        return f"{self._api_name} の取得に失敗しました。" \
-               f"JSONの形式が不正です (ステータスコード 400): {self._detail}"
+        return f"{self.api_name} の取得に失敗しました。" \
+               f"JSONの形式が不正です (ステータスコード 400): {self._details['response']}"
 
-class ApiCommonIdSyncFailedWarning(JDIWarningData):
-    """APIの共通IDとの連携に失敗した場合の警告情報"""
-    status = JDIWarning.API_COMMON_ID_SYNC_FAILED
-
-    def __init__(self, api_type:APIType):
-        """APIの共通IDとの連携に失敗した場合の警告情報
-
-        Parameters
-        ----------
-        api_type : APIType
-            APIの種類
-        """
-        self._api_name = API_TYPE_NAME[api_type]
-
+class ApiCommonIdSyncFailedWarning(ApiRequestWarningData):
+    """APIの共通IDとの連携に失敗した場合の警告情報 (Status code: 400, code: 400900)"""
     def warning_message(self) -> str:
-        return f"{self._api_name} の取得に失敗しました。" \
+        return f"{self.api_name} の取得に失敗しました。" \
                f"共通IDとの連携に失敗しました (ステータスコード 400)"
 
-class ApiDataNotFoundWarning(JDIWarningData):
-    """APIのデータが見つからない場合の警告情報"""
-    status = JDIWarning.API_DATA_NOT_FOUND
-
-    def __init__(self, api_type:APIType, target:str):
+class ApiDataNotFoundWarning(ApiRequestWarningData):
+    """APIのデータが見つからない場合の警告情報 (Status code: 404)"""
+    def __init__(self,
+                 api_type:Union[APIType, str],
+                 target:str,
+                 e:Union[Exception, str, dict, None]=None):
         """APIのデータが見つからない場合の警告情報
 
         Parameters
@@ -251,30 +331,21 @@ class ApiDataNotFoundWarning(JDIWarningData):
             APIの種類
         target : str
             対象 (クエリ文字列など)
+        e : Exception | str | dict | None
+            例外、エラーメッセージ
+            dict の場合はエラー詳細を格納した辞書
         """
-        self._api_name = API_TYPE_NAME[api_type]
-        self._target = target
+        super().__init__(api_type, e)
+        self._details["target"] = target
 
     def warning_message(self) -> str:
-        return f"{self._api_name} の取得に失敗しました。" \
-               f"対象のデータが見つかりません (ステータスコード 404; ターゲット:{self._target})"
+        return f"{self.api_name} の取得に失敗しました。" \
+               f"対象のデータが見つかりません (ステータスコード 404; ターゲット:{self._details['target']})"
 
-class ApiUnexpectedWarning(JDIWarningData):
-    """APIの予期しないエラーが発生した場合の警告情報"""
-    status = JDIWarning.API_UNEXPECTED_ERROR
-
-    def __init__(self, api_type:APIType):
-        """APIの予期しないエラーが発生した場合の警告情報
-
-        Parameters
-        ----------
-        api_type : APIType
-            APIの種類
-        """
-        self._api_name = API_TYPE_NAME[api_type]
-
+class ApiUnexpectedWarning(ApiRequestWarningData):
+    """APIの予期しないエラーが発生した場合の警告情報 (Status code: 500)"""
     def warning_message(self) -> str:
-        return f"{self._api_name} の取得に失敗しました。" \
+        return f"{self.api_name} の取得に失敗しました。" \
                f"予期しないエラーが発生しました (ステータスコード 500)"
 
 def get_api_error(api_type:APIType,
@@ -321,61 +392,76 @@ def get_api_error(api_type:APIType,
 # API (form_detail)
 #
 
-class FormDetailApiInvalidParameterWarning(JDIWarningData):
-    """申請書データ (詳細) のAPIのパラメータが不正な場合の警告情報"""
-    status = JDIWarning.FORM_DETAIL_API_INVALID_PARAMETER
-
-    def __init__(self, response:dict):
+class FormDetailApiInvalidParameterWarning(ApiRequestWarningData):
+    """申請書データ (詳細) のAPIのパラメータが不正な場合の警告情報 (Status code: 400)"""
+    def __init__(self,
+                 response:Union[dict, str],
+                 e:Union[Exception, str, dict, None]=None):
         """申請書データ (詳細) のAPIのパラメータが不正な場合の警告情報
 
         Parameters
         ----------
-        response : dict
+        response : dict | str
             APIのレスポンス
+        e : Exception | str | dict | None
+            例外、エラーメッセージ
+            dict の場合はエラー詳細を格納した辞書
         """
-        self._detail = " / ".join(response.get("detail", []))
+        super().__init__(APIType.REQUEST_DETAIL)
+        if isinstance(response, dict):
+            self._details["response"] = " / ".join(response.get("detail", []))
+        else:
+            self._details["response"] = response
 
     def warning_message(self) -> str:
         return f"{API_TYPE_NAME[APIType.REQUEST_DETAIL]} の取得に失敗しました。" \
-               f"パラメータが不正です (ステータスコード 400): {self._detail} "
+               f"パラメータが不正です (ステータスコード 400): {self._details['response']} "
 
-class FormDetailApiDataNotFoundWarning(JDIWarningData):
-    """指定された申請書データ (詳細) が見つからない場合の警告情報"""
-    status = JDIWarning.FORM_DETAIL_API_API_DATA_NOT_FOUND
-
-    def __init__(self, request_id:str):
+class FormDetailApiDataNotFoundWarning(ApiRequestWarningData):
+    """指定された申請書データ (詳細) が見つからない場合の警告情報 (Status code: 404)"""
+    def __init__(self, request_id:str, e:Union[Exception, str, dict, None]=None):
         """指定された申請書データ (詳細) が見つからない場合の警告情報
 
         Parameters
         ----------
         request_id : str
             対象の申請書ID
+        e : Exception | str | dict | None
+            例外、エラーメッセージ
+            dict の場合はエラー詳細を格納した辞書
         """
-        self._request_id = request_id
+        super().__init__(APIType.REQUEST_DETAIL, e)
+        self._details["request_id"] = request_id
 
     def warning_message(self) -> str:
         return f"{API_TYPE_NAME[APIType.REQUEST_DETAIL]} の取得に失敗しました。" \
-               f"指定された申請書データが見つかりません: {self._request_id} "
+               f"指定された申請書データが見つかりません: {self._details['request_id']} "
 
-class FormDetailApiUnexpectedWarning(JDIWarningData):
-    """申請書データ (詳細) のAPIで予期しないエラーが発生した場合の警告情報"""
-    status = JDIWarning.FORM_DETAIL_API_UNEXPECTED_ERROR
-
-    def __init__(self, status_code:int):
+class FormDetailApiUnexpectedWarning(ApiRequestWarningData):
+    """申請書データ (詳細) のAPIで予期しないエラーが発生した場合の警告情報 (Status code: 500)"""
+    def __init__(self,
+                 status_code:Union[int, str],
+                 e:Union[Exception, str, dict, None]=None):
         """申請書データ (詳細) のAPIで予期しないエラーが発生した場合の警告情報
 
         Parameters
         ----------
-        status_code : int
+        status_code : int | str
             ステータスコード
+        e : Exception | str | dict | None
+            例外、エラーメッセージ
+            dict の場合はエラー詳細を格納した辞書
         """
-        self._status_code = status_code
+        super().__init__(APIType.REQUEST_DETAIL, e)
+        self._details["status_code"] = str(status_code)
 
     def warning_message(self) -> str:
         return f"{API_TYPE_NAME[APIType.REQUEST_DETAIL]} の取得に失敗しました。" \
-               f"予期しないエラーが発生しました (ステータスコード {self._status_code})"
+               f"予期しないエラーが発生しました (ステータスコード {self._details['status_code']})"
 
-def get_form_detail_api_warning(status_code:int, res:dict, request_id:str="") -> JDIWarningData:
+def get_form_detail_api_warning(status_code:int,
+                                res:dict,
+                                request_id:str="") -> ApiRequestWarningData:
     """申請書データ (詳細) のAPIの警告情報を取得
 
     Parameters
@@ -400,9 +486,9 @@ def get_form_detail_api_warning(status_code:int, res:dict, request_id:str="") ->
 
 class DBUpdateFailed(JDIWarningData):
     """DBのデータ更新に失敗した場合の警告情報"""
-    status = JDIWarning.DB_UPDATE_FAILED
-
-    def __init__(self, api_type:APIType, e:Optional[Exception]=None):
+    def __init__(self,
+                 api_type:Union[APIType, str],
+                 e:Union[Exception, str, dict, None]=None):
         """DBのデータ更新に失敗した場合の警告情報
 
         Parameters
@@ -412,12 +498,52 @@ class DBUpdateFailed(JDIWarningData):
         e : Exception, default None
             例外
         """
-        self._api_type = api_type
-        self._exception_name = e.__class__.__name__ if e else ""
-        self._exception_message = e.args[0] if e else ""
+        super().__init__(e)
+        self._details["api_type"] = api_type if isinstance(api_type, str) else api_type.name
 
     def warning_message(self) -> str:
-        if self._exception_name:
-            return f"{API_TYPE_NAME[self._api_type]} のデータ更新に失敗しました。" \
-                   f"例外: {self._exception_name} - {self._exception_message}"
-        return f"{API_TYPE_NAME[self._api_type]} のデータ更新に失敗しました。"
+        if self.exception_name:
+            return f"{API_TYPE_NAME[self._details['api_type']]} のデータ更新に失敗しました。" \
+                   f"例外: {self.exception_name} - {self.args}"
+        return f"{API_TYPE_NAME[self._details['api_type']]} のデータ更新に失敗しました。"
+
+
+#
+# JSONとの変換
+#
+
+_class_registry: Dict[str, JDIWarningData] = {
+    "UnexpectedWarning": UnexpectedWarning,
+    "InvalidConfigFilePath": InvalidConfigFilePath,
+    "InvalidStatusFilePath": InvalidStatusFilePath,
+    "InvalidLogFilePath": InvalidLogFilePath,
+    "ApiInvalidParameterWarning": ApiInvalidParameterWarning,
+    "ApiInvalidJsonFormatWarning": ApiInvalidJsonFormatWarning,
+    "ApiCommonIdSyncFailedWarning": ApiCommonIdSyncFailedWarning,
+    "ApiDataNotFoundWarning": ApiDataNotFoundWarning,
+    "ApiUnexpectedWarning": ApiUnexpectedWarning,
+    "FormDetailApiInvalidParameterWarning": FormDetailApiInvalidParameterWarning,
+    "FormDetailApiDataNotFoundWarning": FormDetailApiDataNotFoundWarning,
+    "FormDetailApiUnexpectedWarning": FormDetailApiUnexpectedWarning,
+    "DBUpdateFailed": DBUpdateFailed
+}
+"""警告情報のクラスを登録 (JSONとの変換用)"""
+
+def from_json(name:str, kwargs:dict) -> JDIWarningData:
+    """JSONから警告情報を生成
+
+    Parameters
+    ----------
+    name : str
+        警告情報のクラス名
+    kwargs : dict
+        警告情報の引数
+
+    Returns
+    -------
+    JDIWarningData
+        警告情報
+    """
+    if name not in _class_registry:
+        raise ValueError(f"Invalid warning class name: {name}")
+    return _class_registry[name](**kwargs)

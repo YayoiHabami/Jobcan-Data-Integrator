@@ -60,6 +60,15 @@ integrator:
                 ☐ basic_dataについて処理を追加する
                 ☐ `JobcanDataIntegrator._is_future_progress`に条件分岐を追加する
             ☐ 再度開始するための`.restart`メソッドを追加する (`TerminatingStatus.COMPLETED`でなければ`.is_canceled`を`False`にして再開:`._initialize`と`.run`を実行)
+        ☐ `app_status`を管理するメンバを2つに統合する
+            ✔ `ProgressStatus`から`FAILED`を削除する @done(24-08-22 12:44)
+            ✔ `ErrorStatus`を削除する @done(24-08-22 13:19)
+            ✔ `JDIWarning`を削除する @done(24-08-22 16:32)
+            ✔ `JDIErrorData`クラスから`.status`メンバを削除、`._update_progress`もそれに対応させる @done(24-08-22 16:32)
+            ✔ `JDIErrorData`クラスに`._details:Dict[str,str]`を追加、全メンバ変数を置き換える。 @done(24-08-22 14:15)
+            ✔ `JDIErrorData`のコンストラクタに`e`を受け取らせ、`._exception_name`, `._args`プロパティを追加する @done(24-08-22 14:14)
+            ✔ app_statusに`current_error`を追加し、`JobcanDIStatus`に`has_error`プロパティ (`is not None`) を追加する @done(24-08-22 15:03)
+            ✔ `JobcanDataIntegrator`の`current_progress`プロパティを削除し、`has_error`プロパティを追加する @done(24-08-22 16:33)
         例外処理:
             ✔ (以降の処理を行わない)致命的なエラーが発生した場合に、`._is_canceled`を`True`にする @done(24-08-18 15:27)
             ✔ 各処理の冒頭に、`._is_canceled`が`True`になっていないかの判定を追加する @done(24-08-18 15:27)
@@ -79,11 +88,14 @@ integrator:
                 ☐ エラーの場合、`.cancel`してreturnする
                 ☐ `.restart`メソッドを追加する
                 ☐ `app.py`側で接続エラーの場合の処理を追加する
+            ✔ `._update_progress`の第二引数を`DetailedProgressStatus`のみとする @done(24-08-22 20:38)
+                ✔ `JDIErrorData`と`JDIWarningData`を分離し、`_update_isssues`を追加する @done(24-08-22 20:38)
             ☐ `UnknownError`に、エラーの詳細(traceback)を保存する
                 ☐ そのほか詳細が欲しいエラーについても同様 (APIレスポンス保存時KeyErrorとかSQLエラー)
             ☐ `._update_data`でKeyError等JSON変換エラーをキャッチする (warning)
             ☐ テーブルを正常に作成できているかの確認を追加 (`._init_tables`)
             ☐ 最終的にエラーメッセージと対処法へのリンクを張る。対処法はdocにmarkdownで記述する。クラッシュした際などに、その実行で発生したエラー等と解決策をまとめたcrash-report.htmlを出力したい。
+            ☐ `.cancel`の責を`._run`に移す
         完了時処理:
             ✔ `JobcanDataIntegrator.update_progress`について、`ProgressStatus.TERMINATING`である場合の処理を追加 (他の値の`None`を許容) @done(24-08-16 16:05)
         BASIC_DATA:

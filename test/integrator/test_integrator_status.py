@@ -3,7 +3,7 @@ import pytest
 from integrator.progress_status import (
     APIType, ProgressStatus,
     InitializingStatus, GetBasicDataStatus, GetFormOutlineStatus,
-    GetFormDetailStatus, TerminatingStatus, ErrorStatus
+    GetFormDetailStatus, TerminatingStatus
 )
 from integrator.integrator_status import AppProgress, FetchFailureRecord, JobcanDIStatus
 
@@ -69,12 +69,6 @@ class TestAppProgress:
         assert app_progress.is_future_process((ProgressStatus.BASIC_DATA,
                                                GetBasicDataStatus.GET_POSITION),
                                               specific="user3") is True
-
-    def test_is_future_process_error_cases(self, app_progress):
-        assert app_progress.is_future_process((ProgressStatus.FAILED,
-                                               ErrorStatus.UNKNOWN_ERROR)) is False
-        app_progress.set(ProgressStatus.FAILED, ErrorStatus.UNKNOWN_ERROR)
-        assert app_progress.is_future_process(APIType.USER_V3) is False
 
     @pytest.mark.parametrize("outline,detail,specifics,progress,specific,expected", [
         (   # 処理済み1
