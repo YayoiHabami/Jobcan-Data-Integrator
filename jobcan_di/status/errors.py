@@ -422,6 +422,11 @@ class NotInitializedError(JDIErrorData):
     def error_message(self) -> str:
         return "初期化されていません。ログを確認し、初期化処理の失敗原因を確認してください。"
 
+class ApiClientNotPrepared(JDIErrorData):
+    """APIクライアントが準備されていない場合のエラー情報"""
+    def error_message(self) -> str:
+        return "APIクライアントが準備されていません。APIのトークンが正しく設定されているかなどを確認してください。"
+
 
 #
 # JSONとの変換
