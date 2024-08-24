@@ -1,16 +1,21 @@
 import pytest
 
-from integrator.progress_status import (
+from jobcan_di.integrator.progress_status import (
     APIType, ProgressStatus,
     InitializingStatus, GetBasicDataStatus, GetFormOutlineStatus,
-    GetFormDetailStatus, TerminatingStatus
+    GetFormDetailStatus, TerminatingStatus,
+    get_progress_status, get_detailed_progress_status
 )
-from integrator.integrator_status import AppProgress, FetchFailureRecord, JobcanDIStatus
+from jobcan_di.integrator.integrator_status import (
+    AppProgress, FailureRecord, FetchFailureRecord, DBSaveFailureRecord,
+    JobcanDIStatus,
+    merge_failure_record, merge_status
+)
 
 
 
-# AppProgressのテスト
 def test_app_progress():
+    """AppProgressのテスト"""
     progress = AppProgress()
     progress.add_specifics([1, 2, 3])
     assert progress.get() == (ProgressStatus.TERMINATING, TerminatingStatus.COMPLETED)
@@ -40,20 +45,23 @@ def test_app_progress():
     new_progress.set(ProgressStatus.TERMINATING, TerminatingStatus.COMPLETED)
     assert new_progress.specifics == {1, 2, 3, 4}
 
-# AppProgressのテスト (.is_future_processメソッド)
 class TestAppProgress:
+    """AppProgressのis_future_progressメソッドのテスト"""
 
     @pytest.fixture
     def app_progress(self):
+        """AppProgressのインスタンスを返すfixture"""
         return AppProgress(outline = ProgressStatus.BASIC_DATA,
                            detail = GetBasicDataStatus.GET_POSITION)
 
     def test_is_future_process_api_type(self, app_progress):
+        """APITypeを指定した場合のテスト"""
         assert app_progress.is_future_process(APIType.USER_V3) is False
         assert app_progress.is_future_process(APIType.POSITION_V1) is True
         assert app_progress.is_future_process(APIType.FORM_V1) is True
 
     def test_is_future_process_progress_tuple(self, app_progress):
+        """ProgressStatusとGetBasicDataStatusのタプルを指定した場合のテスト"""
         assert app_progress.is_future_process((ProgressStatus.BASIC_DATA,
                                                GetBasicDataStatus.GET_USER)) is False
         assert app_progress.is_future_process((ProgressStatus.BASIC_DATA,
@@ -62,6 +70,7 @@ class TestAppProgress:
                                                GetFormDetailStatus.GET_DETAIL)) is True
 
     def test_is_future_process_with_specific(self, app_progress):
+        """ProgressStatusとGetBasicDataStatusのタプルとspecificを指定した場合のテスト"""
         app_progress.add_specifics(["user1", "user2"])
         assert app_progress.is_future_process((ProgressStatus.BASIC_DATA,
                                                GetBasicDataStatus.GET_POSITION),
@@ -102,11 +111,13 @@ class TestAppProgress:
     ])
     def test_is_future_process_various_states(self, outline, detail, specifics,
                                               progress, specific, expected):
+        """様々な状態でspecificを指定した/しなかった場合のテスト
+        主にAPITypeとの兼ね合いを確認する"""
         app_progress = AppProgress(outline=outline, detail=detail, specifics=specifics)
         assert app_progress.is_future_process(progress, specific=specific) is expected
 
-# FetchFailureRecordのテスト
 def test_fetch_failure_record():
+    """FetchFailureRecordのテスト"""
     record = FetchFailureRecord()
 
     # 基本データの追加と取得のテスト
@@ -147,8 +158,8 @@ def test_fetch_failure_record():
     assert record.get(APIType.USER_V3) == set()
     assert record.get_request_detail() == {}
 
-# JobcanDIStatusのテスト
 def test_jobcan_di_status(tmp_path):
+    """JobcanDIStatusのテスト"""
     status = JobcanDIStatus(str(tmp_path))
 
     # 初期状態の確認
@@ -166,7 +177,7 @@ def test_jobcan_di_status(tmp_path):
     status.fetch_failure_record.add(APIType.USER_V3, "123")
     status.fetch_failure_record.add(APIType.USER_V3, "123")
     status.fetch_failure_record.add(APIType.USER_V3, "456")
-    last_access = {1: "2021-01-01T00:00:00", 2: "2021-01-02T00:00:00"}
+    last_access = {1: "2021/01/01 00:00:00", 2: "2021-01-02T00:00:00"}
     status.form_api_last_access = last_access
 
     # 保存と読み込みのテスト
@@ -187,8 +198,8 @@ def test_jobcan_di_status(tmp_path):
     assert new_status.progress.get() == (ProgressStatus.INITIALIZING, None)
     assert new_status.progress.specifics == set()
 
-# エラーケースのテスト
 def test_fetch_failure_record_errors():
+    """FetchFailureRecordのエラーケースのテスト"""
     record = FetchFailureRecord()
 
     # REQUEST_DETAILにform_idなしで追加しようとするとエラー
@@ -198,3 +209,128 @@ def test_fetch_failure_record_errors():
     # REQUEST_DETAILからform_idなしで取得しようとするとエラー
     with pytest.raises(ValueError):
         record.get(APIType.REQUEST_DETAIL)
+
+@pytest.fixture
+def failure_record_prev():
+    """古い方のFetchFailureRecordのインスタンスを返すfixture"""
+    fr = {
+        "basic_data": {
+            "USER_V3": {"1", "2", "3"},
+            "GROUP_V1": {"1", "2", "3"},
+            "POSITION_V1": {"1", "2", "3"},
+            "FORM_V1": {"1", "2", "3"},
+            "REQUEST_OUTLINE": {"1", "2", "3"},
+        },
+        "request_detail": {
+            "789": {"1", "2", "3"},
+            "123": {"1", "2", "3"},
+        }
+    }
+    return FailureRecord(**fr)
+
+@pytest.fixture
+def failure_record_new():
+    """新しい方のFetchFailureRecordのインスタンスを返すfixture"""
+    fr = {
+        "basic_data": {
+            "USER_V3": {"1", "3", "5"},
+            "GROUP_V1": {"1", "3", "5"},
+            "POSITION_V1": {"1", "3", "5"},
+            "FORM_V1": {"1", "3", "5"},
+            "REQUEST_OUTLINE": {"1", "3", "5"},
+        },
+        "request_detail": {
+            "789": {"1", "3", "5"},
+            "123": {"1", "3", "5"},
+        }
+    }
+    return FailureRecord(**fr)
+
+@pytest.mark.parametrize("api_type", [
+    APIType.USER_V3, APIType.GROUP_V1, APIType.POSITION_V1, APIType.FORM_V1,
+    APIType.REQUEST_OUTLINE, APIType.REQUEST_DETAIL, None
+])
+def test_merge_failure_record(failure_record_prev, failure_record_new, api_type):
+    """FailureRecordのマージのテスト
+
+    - api_typeは現在の進捗、Noneの場合は最も進んでいる進捗を基準とする"""
+    if api_type is not None:
+        ap = AppProgress(outline = get_progress_status(api_type),
+                         detail = get_detailed_progress_status(api_type))
+    else:
+        # api_typeがNoneの場合、進捗が最も進んでいるものを基準とする
+        ap = AppProgress(outline = ProgressStatus.TERMINATING,
+                         detail = TerminatingStatus.COMPLETED)
+
+    merged = merge_failure_record(failure_record_prev, failure_record_new,
+                                   FailureRecord(), ap)
+
+    for at in APIType:
+        if at == APIType.REQUEST_DETAIL:
+            if api_type is None or api_type.value > at.value:
+                # 進捗がREQUEST_DETAIL以降の場合、newのデータが優先される
+                assert merged.get(at, form_id=123) == {"1", "3", "5"}
+                assert merged.get(at, form_id=789) == {"1", "3", "5"}
+            else:
+                # 進捗がREQUEST_DETAIL以前の場合、prevとnewのデータが結合される
+                assert merged.get(at, form_id=123) == {"1", "2", "3", "5"}
+                assert merged.get(at, form_id=789) == {"1", "2", "3", "5"}
+        else:
+            if api_type is None or api_type.value > at.value:
+                # 進捗(api_type)よりも前の要素の場合、newのデータが優先される
+                assert merged.get(at) == {"1", "3", "5"}
+            else:
+                # 進捗(api_type)よりも後の要素の場合、prevとnewのデータが結合される
+                assert merged.get(at) == {"1", "2", "3", "5"}
+
+def test_merge_status(failure_record_prev, failure_record_new):
+    """merge_statusのテスト"""
+    # 古い方のステータス
+    prev = JobcanDIStatus("prev-test")
+    prev.fetch_failure_record = FetchFailureRecord(**failure_record_prev.asdict())
+    prev.db_save_failure_record = DBSaveFailureRecord(**failure_record_prev.asdict())
+    prev.progress = AppProgress(outline=ProgressStatus.BASIC_DATA,
+                                detail=GetBasicDataStatus.GET_USER)
+    prev.form_api_last_access = {1: "2021/01/01 00:00:00",
+                                 3: "2021/01/03 00:00:00",
+                                 4: "2021/01/04 00:00:00"}
+    prev.config_file_path = "prev-config"
+
+    # 新しい方のステータス
+    new = JobcanDIStatus("new-test")
+    new.fetch_failure_record = FetchFailureRecord(**failure_record_new.asdict())
+    new.db_save_failure_record = DBSaveFailureRecord(**failure_record_new.asdict())
+    new.progress = AppProgress(outline=ProgressStatus.BASIC_DATA,
+                               detail=GetBasicDataStatus.GET_GROUP)
+    new.form_api_last_access = {2: "2021/01/02 00:00:00",
+                                3: "2021/01/01 00:00:00"}
+    new.config_file_path = "new-config"
+
+    # マージ
+    merged = merge_status(new, prev)
+
+    # failure_recordについてはmerge_failure_recordのテストと同様の結果となることを確認
+    for at in APIType:
+        if at == APIType.REQUEST_DETAIL:
+            if APIType.GROUP_V1.value > at.value:
+                assert merged.fetch_failure_record.get(at, form_id=123) == {"1", "3", "5"}
+                assert merged.fetch_failure_record.get(at, form_id=789) == {"1", "3", "5"}
+            else:
+                assert merged.fetch_failure_record.get(at, form_id=123) == {"1", "2", "3", "5"}
+                assert merged.fetch_failure_record.get(at, form_id=789) == {"1", "2", "3", "5"}
+        else:
+            if APIType.GROUP_V1.value > at.value:
+                assert merged.fetch_failure_record.get(at) == {"1", "3", "5"}
+            else:
+                assert merged.fetch_failure_record.get(at) == {"1", "2", "3", "5"}
+
+    # form_api_last_accessについては各要素について日時が最新のものが選択されることを確認
+    # 例えばnewの方の日時が古ければprevの日時が選択され、new/prevの片方にしかない要素はそのまま残る
+    assert merged.form_api_last_access == {1: "2021/01/01 00:00:00",
+                                           2: "2021/01/02 00:00:00",
+                                           3: "2021/01/03 00:00:00",
+                                           4: "2021/01/04 00:00:00"}
+
+    # その他についてはnewのデータが優先されることを確認
+    assert merged.progress.get() == (ProgressStatus.BASIC_DATA, GetBasicDataStatus.GET_GROUP)
+    assert merged.config_file_path == "new-config"

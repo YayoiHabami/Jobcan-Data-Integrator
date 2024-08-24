@@ -413,6 +413,15 @@ def get_api_error(api_type:APIType,
 
     return UnexpectedError(f"APIによるデータ取得時に不明なエラーが発生しました (ステータスコード {status_code})")
 
+#
+# 処理中のエラー
+#
+
+class NotInitializedError(JDIErrorData):
+    """初期化されていない場合のエラー情報"""
+    def error_message(self) -> str:
+        return "初期化されていません。ログを確認し、初期化処理の失敗原因を確認してください。"
+
 
 #
 # JSONとの変換
@@ -430,6 +439,7 @@ _class_registry: Dict[str, JDIErrorData] = {
     "ApiCommonIdSyncFailedError": ApiCommonIdSyncFailedError,
     "ApiDataNotFoundError": ApiDataNotFoundError,
     "ApiUnexpectedError": ApiUnexpectedError,
+    "NotInitializedError": NotInitializedError,
     "UnexpectedError": UnexpectedError
 }
 """エラークラスの登録 (JSONとの変換用)"""

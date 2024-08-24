@@ -21,6 +21,9 @@ integrator:
     ✔ `.update_progress`と`.logger`を統合して隠蔽する @done(24-08-16 21:21)
     ✔ `_update_basic_data`などを分割、`._run`内で呼び出す @done(24-08-22 10:29)
     ☐ キャンセル時にapp_statusを保存するべきか検証する
+    ログ・通知:
+        ☐ `ToastProgressNotifier`の`.notify`で前回の通知を記録し、直前の通知と同じ内容の場合は通知しないようにする
+        ☐ `Logger`の`.log`で前回のログを記録し、直前のログと同じ内容の場合はログしないようにする
     非同期処理:
         ☐ `JobcanDataIntegrator` の `._initialize` の各処理を非同期処理に変更する
         ☐ `JobcanDataIntegrator` の `._run` の各処理を非同期処理に変更する
@@ -59,8 +62,7 @@ integrator:
             ☐ 読み込み時に`FetchFailureRecord`が空でないAPIについて、再度処理を行うなどの処理を追加する
                 ☐ basic_dataについて処理を追加する
                 ☐ `JobcanDataIntegrator._is_future_progress`に条件分岐を追加する
-            ☐ 再度開始するための`.restart`メソッドを追加する (`TerminatingStatus.COMPLETED`でなければ`.is_canceled`を`False`にして再開:`._initialize`と`.run`を実行)
-        ☐ `app_status`を管理するメンバを2つに統合する
+        ✔ `app_status`を管理するメンバを2つに統合する @done(24-08-23 08:31)
             ✔ `ProgressStatus`から`FAILED`を削除する @done(24-08-22 12:44)
             ✔ `ErrorStatus`を削除する @done(24-08-22 13:19)
             ✔ `JDIWarning`を削除する @done(24-08-22 16:32)
@@ -84,10 +86,20 @@ integrator:
                     ✔ app_statusにDB関連エラー`DBSaveFailureRecord`を追加する @done(24-08-21 19:51)
                     ✔ 値を取得するすべての場所に`.cancel`を追加する @done(24-08-22 10:30)
                 ✔ `._update_progress`は、`.cancel`内を除きエラーを受け取らないようにする @done(24-08-22 10:12)
-                ☐ エラーの場合、前回と今回の進捗を合成する
-                ☐ エラーの場合、`.cancel`してreturnする
-                ☐ `.restart`メソッドを追加する
-                ☐ `app.py`側で接続エラーの場合の処理を追加する
+                ✔ エラーの場合、前回と今回の進捗を合成する @done(24-08-24 12:55)
+                    ✔ progress, current_error、config_file_pathは現在のものを採用 @done(24-08-24 12:55)
+                    ✔ failure_recordは、終了済みのものについては現在のものを、そうでないものは現在と今回の和集合を取る @done(24-08-24 12:55)
+                    ✔ form_api_last_accessは新しい方を採用 @done(24-08-24 12:55)
+                ✔ エラーの場合、`.cancel`してreturnする @done(24-08-22 21:09)
+                ☐ `._previous_progress`を`._previous_status`に変更する; 前回の失敗状況や最終読み込み日時が_previousに行くことで、app_statusには今回失敗した内容しか保持されずわかりやすくなる
+                    ☐ app_status初期読み込み時にfailure_recordを初期化する (影響範囲大)
+                    ☐ app_statusの各メンバを使用している箇所を変更する (影響範囲大)
+                    ☐ `.cancel`時に前回と今回をどう扱うかを検討する; `.cancel`に限らず`.run`終了時には_previousにマージされたものが格納され、`.restart`または`.cleanup`時にapp_statusが一部取り込み、アプリ終了時の最終保存時にマージしたものを保存 (起動中は_previousよりも保存されたapp_statusの方が短い可能性が高い)
+                    ☐ `JobcanDIStatus`をpreviousとしてコピーする関数`copy_as_previous`を`integrator_status.py`に追加
+                    ☐ `._run`の冒頭で未初期化の場合のエラーを_previousのcurrent_errorから取得・設定する
+                ✔ `.restart`メソッドを追加する @done(24-08-24 15:16)
+                ✔ `app.py`側で接続エラーの場合の処理を追加する @done(24-08-23 08:32)
+                    ☐ 外側から`JobcanDataIntegrator`の進捗を操作するメソッドを追加する（`._update_progress`を呼び出し、再開時刻を表示する）
             ✔ `._update_progress`の第二引数を`DetailedProgressStatus`のみとする @done(24-08-22 20:38)
                 ✔ `JDIErrorData`と`JDIWarningData`を分離し、`_update_isssues`を追加する @done(24-08-22 20:38)
             ☐ `UnknownError`に、エラーの詳細(traceback)を保存する
@@ -95,7 +107,9 @@ integrator:
             ☐ `._update_data`でKeyError等JSON変換エラーをキャッチする (warning)
             ☐ テーブルを正常に作成できているかの確認を追加 (`._init_tables`)
             ☐ 最終的にエラーメッセージと対処法へのリンクを張る。対処法はdocにmarkdownで記述する。クラッシュした際などに、その実行で発生したエラー等と解決策をまとめたcrash-report.htmlを出力したい。
-            ☐ `.cancel`の責を`._run`に移す
+            ✔ `.cancel`の責を`._run`に移す @done(24-08-22 21:09)
+            ✔ `._initialize`にも`try-except`を追加する @done(24-08-24 15:03)
+            ☐ `.cancel`を複数回実行しても状態が変化しないことを確認する
         完了時処理:
             ✔ `JobcanDataIntegrator.update_progress`について、`ProgressStatus.TERMINATING`である場合の処理を追加 (他の値の`None`を許容) @done(24-08-16 16:05)
         BASIC_DATA:
