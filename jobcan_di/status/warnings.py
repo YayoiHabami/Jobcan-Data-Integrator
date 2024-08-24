@@ -1,5 +1,5 @@
 """
-jobcan_di.integrator.integrator_warnings
+jobcan_di.status.warnings
 
 警告情報を提供するモジュール
 
@@ -31,7 +31,7 @@ from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 from typing import Optional, Union, Dict
 
-from .progress_status import APIType, API_TYPE_NAME
+from .progress import APIType, API_TYPE_NAME
 
 
 

@@ -1,12 +1,13 @@
+"""statusモジュールのテスト"""
 import pytest
 
-from jobcan_di.integrator.progress_status import (
+from jobcan_di.status.progress import (
     APIType, ProgressStatus,
     InitializingStatus, GetBasicDataStatus, GetFormOutlineStatus,
     GetFormDetailStatus, TerminatingStatus,
     get_progress_status, get_detailed_progress_status
 )
-from jobcan_di.integrator.integrator_status import (
+from jobcan_di.status.status import (
     AppProgress, FailureRecord, FetchFailureRecord, DBSaveFailureRecord,
     JobcanDIStatus,
     merge_failure_record, merge_status

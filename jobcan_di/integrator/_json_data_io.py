@@ -8,7 +8,7 @@ Functions
 import json
 import os
 
-from .progress_status import APIType
+from jobcan_di.status.progress import APIType
 
 def save_response_to_json(response: dict,
                           api_type: APIType,

@@ -1,10 +1,11 @@
+"""ThrottledRequests クラスのテストモジュール"""
 import time
 from unittest.mock import patch, Mock
 
 import pytest
 import requests
 
-from integrator.throttled_request import ThrottledRequests
+from jobcan_di.gateway.throttled_request import ThrottledRequests
 
 
 

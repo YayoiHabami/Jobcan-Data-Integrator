@@ -8,7 +8,7 @@ from tempfile import mkdtemp
 import pytest
 
 # Assuming the module is named temp_file_io.py
-from integrator._tf_io import TempFormOutline, TempDataIO, JobcanTempDataIO
+from jobcan_di.integrator._tf_io import TempFormOutline, TempDataIO, JobcanTempDataIO
 
 
 

@@ -30,12 +30,12 @@ import json
 from os import path, makedirs
 from typing import Dict, Optional, Union, Tuple, Set, Iterable, Literal, TypeVar
 
-from .progress_status import (
+from .progress import (
     ProgressStatus, DetailedProgressStatus, TerminatingStatus,
     APIType, get_detailed_progress_status_from_str,
     get_progress_status, get_detailed_progress_status
 )
-from .integrator_errors import JDIErrorData, from_json as error_from_json
+from .errors import JDIErrorData, from_json as error_from_json
 
 
 

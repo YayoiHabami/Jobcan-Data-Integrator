@@ -1,5 +1,5 @@
 """
-jobcan_di.integrator.integrator_errors
+jobcan_di.status.errors
 エラー情報を提供するモジュール
 
 Classes
@@ -25,7 +25,7 @@ from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 from typing import Optional, Union, Dict
 
-from .progress_status import API_TYPE_NAME, APIType
+from .progress import API_TYPE_NAME, APIType
 
 
 
