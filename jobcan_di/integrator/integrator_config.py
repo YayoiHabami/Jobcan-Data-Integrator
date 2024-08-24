@@ -26,8 +26,8 @@ from os import path, makedirs
 from typing import Optional
 
 from jobcan_di.config.config_editor import ConfigEditor
-from .progress_status import APIType
-from .integrator_status import JobcanDIStatus
+from jobcan_di.status.progress import APIType
+from jobcan_di.status import JobcanDIStatus
 
 
 

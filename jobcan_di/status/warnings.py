@@ -1,5 +1,5 @@
 """
-jobcan_di.integrator.integrator_warnings
+jobcan_di.status.warnings
 
 警告情報を提供するモジュール
 
@@ -17,6 +17,7 @@ Classes
 - `ApiCommonIdSyncFailedWarning` : APIの共通IDとの連携に失敗した場合の警告情報
 - `ApiDataNotFoundWarning` : APIのデータが見つからない場合の警告情報
 - `ApiUnexpectedWarning` : APIの予期しないエラーが発生した場合の警告情報
+- `ApiResponseJsonDecodeError` : APIのレスポンスのJSONデコードに失敗した場合の警告情報
 - `FormDetailApiInvalidParameterWarning` : 申請書データ (詳細) のAPIのパラメータが不正な場合の警告情報
 - `FormDetailApiDataNotFoundWarning` : 指定された申請書データ (詳細) が見つからない場合の警告情報
 - `FormDetailApiUnexpectedWarning` : 申請書データ (詳細) のAPIで予期しないエラーが発生した場合の警告情報
@@ -31,7 +32,7 @@ from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 from typing import Optional, Union, Dict
 
-from .progress_status import APIType, API_TYPE_NAME
+from .progress import APIType, API_TYPE_NAME
 
 
 
@@ -46,18 +47,21 @@ class JDIWarningData(metaclass=ABCMeta):
             例外、エラーメッセージ、エラー情報
             dictの場合は、エラー情報を格納した辞書
         """
-        self.details: dict = {}
+        self._details: dict = {}
 
         if isinstance(e, str):
             e_name = "UnexpectedError"
             e_args = e
         elif isinstance(e, Exception):
             e_name = e.__class__.__name__
-            e_args = e.args[0] if e.args else ""
+            e_args = str(e.args[0]) if e.args else ""
         elif isinstance(e, dict):
             e_name = e.get("exception_name", "UnexpectedError")
             e_args = e.get("args", "")
             self._details = e
+        else:
+            e_name = None
+            e_args = None
 
         self._details["e"] = {
             "exception_name": e_name,
@@ -348,6 +352,36 @@ class ApiUnexpectedWarning(ApiRequestWarningData):
         return f"{self.api_name} の取得に失敗しました。" \
                f"予期しないエラーが発生しました (ステータスコード 500)"
 
+class ApiResponseJsonDecodeError(ApiRequestWarningData):
+    """APIのレスポンスのJSONデコードに失敗した場合の警告情報"""
+    def __init__(self, api_type:APIType,
+                 status_code:int, res:str, url:str,
+                 e:Union[Exception, str, dict, None]=None):
+        """APIのレスポンスのJSONデコードに失敗した場合の警告情報
+
+        Parameters
+        ----------
+        api_type : APIType
+            APIの種類
+        status_code : int
+            ステータスコード
+        res : str
+            レスポンス
+        url : str
+            URL
+        """
+        super().__init__(api_type, e)
+
+        self._details["status_code"] = status_code
+        self._details["res"] = res
+        self._details["url"] = url
+
+    def warning_message(self) -> str:
+        return f"{self.api_name} の取得に失敗しました。" \
+               f"レスポンスのJSONデコードに失敗しました (ステータスコード {self._details['status_code']}; "\
+               f"URL: {self._details['url']})"
+
+
 def get_api_error(api_type:APIType,
                   status_code:int, res:dict,
                   target:str="") -> JDIWarningData:
@@ -512,7 +546,7 @@ class DBUpdateFailed(JDIWarningData):
 # JSONとの変換
 #
 
-_class_registry: Dict[str, JDIWarningData] = {
+_class_registry: Dict[str, type[JDIWarningData]] = {
     "UnexpectedWarning": UnexpectedWarning,
     "InvalidConfigFilePath": InvalidConfigFilePath,
     "InvalidStatusFilePath": InvalidStatusFilePath,
@@ -522,6 +556,7 @@ _class_registry: Dict[str, JDIWarningData] = {
     "ApiCommonIdSyncFailedWarning": ApiCommonIdSyncFailedWarning,
     "ApiDataNotFoundWarning": ApiDataNotFoundWarning,
     "ApiUnexpectedWarning": ApiUnexpectedWarning,
+    "ApiResponseJsonDecodeError": ApiResponseJsonDecodeError,
     "FormDetailApiInvalidParameterWarning": FormDetailApiInvalidParameterWarning,
     "FormDetailApiDataNotFoundWarning": FormDetailApiDataNotFoundWarning,
     "FormDetailApiUnexpectedWarning": FormDetailApiUnexpectedWarning,

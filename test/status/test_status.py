@@ -1,12 +1,13 @@
+"""statusモジュールのテスト"""
 import pytest
 
-from jobcan_di.integrator.progress_status import (
+from jobcan_di.status.progress import (
     APIType, ProgressStatus,
     InitializingStatus, GetBasicDataStatus, GetFormOutlineStatus,
     GetFormDetailStatus, TerminatingStatus,
     get_progress_status, get_detailed_progress_status
 )
-from jobcan_di.integrator.integrator_status import (
+from jobcan_di.status.status import (
     AppProgress, FailureRecord, FetchFailureRecord, DBSaveFailureRecord,
     JobcanDIStatus,
     merge_failure_record, merge_status
@@ -157,6 +158,19 @@ def test_fetch_failure_record():
     record.clear()
     assert record.get(APIType.USER_V3) == set()
     assert record.get_request_detail() == {}
+
+    # initializeメソッドのテスト
+    expected_dict["request_detail"] = dict()
+    expected_dict["basic_data"][APIType.USER_V3.name] = set()
+    expected_dict["basic_data"][APIType.GROUP_V1.name] = set()
+    record.initialize()
+    assert record.asdict() == expected_dict
+
+    # 複数のデータをaddする場合のテスト
+    record.add(APIType.USER_V3, ["123", "456"])
+    assert record.get(APIType.USER_V3) == {"123", "456"}
+    record.add(APIType.USER_V3, ["456", "789"])
+    assert record.get(APIType.USER_V3) == {"123", "456", "789"}
 
 def test_jobcan_di_status(tmp_path):
     """JobcanDIStatusのテスト"""

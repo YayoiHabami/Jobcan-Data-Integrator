@@ -54,13 +54,13 @@ from win11toast import (
     clear_toast
 )
 
-from .integrator_config import LogLevel
-from .progress_status import (
+from jobcan_di.status.progress import (
     ProgressStatus, DetailedProgressStatus,
     get_progress_status_msg,
     PROGRESS_STATUS_MSG
 )
-from .integrator_errors import JDIErrorData
+from jobcan_di.status.errors import JDIErrorData
+from .integrator_config import LogLevel
 
 
 

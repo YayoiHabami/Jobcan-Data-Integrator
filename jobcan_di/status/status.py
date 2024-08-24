@@ -30,12 +30,12 @@ import json
 from os import path, makedirs
 from typing import Dict, Optional, Union, Tuple, Set, Iterable, Literal, TypeVar
 
-from .progress_status import (
+from .progress import (
     ProgressStatus, DetailedProgressStatus, TerminatingStatus,
     APIType, get_detailed_progress_status_from_str,
     get_progress_status, get_detailed_progress_status
 )
-from .integrator_errors import JDIErrorData, from_json as error_from_json
+from .errors import JDIErrorData, from_json as error_from_json
 
 
 
@@ -262,6 +262,10 @@ class AppProgress:
                     return True
                 # specificが指定されている場合は、specificsに含まれているかどうかで判定
                 return specific not in self._specifics
+            elif self._detail is None:
+                # 進捗状況(概要)が同じで、現在の(詳細)だけがNoneの場合は常に未処理と判定
+                # 詳細がNoneとなるのは初期化前の状態のみであるため
+                return True
 
             # 進捗状況(詳細)が異なり、どちらもエラーでない場合
             return pd.value > self._detail.value
@@ -312,7 +316,11 @@ class FailureRecord:
 
         self.initialize(basic_data, request_detail)
 
-    def add(self, api_type:APIType, target:str, *, form_id:Optional[int]=None) -> None:
+    def add(self,
+            api_type:APIType,
+            target:Union[str, set[str]],
+            *,
+            form_id:Optional[int]=None) -> None:
         """処理に失敗した対象を追加する
 
         Parameters
@@ -326,13 +334,22 @@ class FailureRecord:
             処理に失敗した申請書のID、api_type が REQUEST_DETAIL の場合のみ指定
         """
         if api_type == APIType.REQUEST_DETAIL:
+            # 申請書(詳細)の取得に失敗した対象
             if form_id is None:
                 raise ValueError("form_id must be specified when api_type is REQUEST_DETAIL")
             if form_id not in self._request_detail:
                 self._request_detail[form_id] = set()
-            self._request_detail[form_id].add(target)
+
+            if isinstance(target, str):
+                self._request_detail[form_id].add(target)
+            else:
+                self._request_detail[form_id].update(target)
         else:
-            self._basic_data[api_type].add(target)
+            # 申請書(詳細)以外のデータ
+            if isinstance(target, str):
+                self._basic_data[api_type].add(target)
+            else:
+                self._basic_data[api_type].update(target)
 
     def initialize(
             self,
@@ -753,8 +770,10 @@ def merge_app_progress(prev:AppProgress, current:AppProgress) -> AppProgress:
         # 前回の進捗状況が終了済みの場合は現在の進捗状況を優先
         return AppProgress(**current.asdict())
 
-    return AppProgress(outline=current.outline,
-                       detail=current.detail if current.detail is not None else prev.detail)
+    outline, detail = current.get()
+    if detail is None:
+        detail = prev.get()[1]
+    return AppProgress(outline=outline, detail=detail)
 
 # TypeVarを利用して、FailureRecordのサブクラスを指定する
 _FailureRecordT = TypeVar("_FailureRecordT", bound=FailureRecord)

@@ -8,8 +8,8 @@ Classes
 import datetime
 from os import path, makedirs
 
+from jobcan_di.status.progress import ProgressStatus, MAX_STATUS_LENGTH
 from .integrator_config import LogLevel, MAX_LOG_LEVEL_LENGTH
-from .progress_status import ProgressStatus, MAX_STATUS_LENGTH
 
 
 

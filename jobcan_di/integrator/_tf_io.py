@@ -11,85 +11,9 @@ Notes:
 import json
 from os import path, makedirs, remove
 import shutil
-from typing import Dict, Union, Iterable, Optional
+from typing import Dict, Optional
 
-
-
-class TempFormOutline:
-    """Data class for form outline (temporary)"""
-    def __init__(self,
-                 success: bool = False,
-                 ids: Union[list[str], set[str], None] = None,
-                 last_access: str = ""):
-        """Constructor
-
-        Parameters
-        ----------
-        success : bool
-            Success flag
-        ids : list[str] | set[str] | None
-            list or set of request_id
-        last_access : str
-            Last access datetime
-        """
-        self.success: bool = success
-        """Success flag"""
-        self.ids: set[str] = set(ids) if ids else set()
-        """set of request_id"""
-        self.last_access: str = last_access
-        """Last access datetime"""
-
-    def add_ids(self, ids: Iterable[str]):
-        """Add request_id to the set
-
-        Parameters
-        ----------
-        ids : Iterable[str]
-            list or set of request_id
-        """
-        self.ids.update(ids)
-
-    def remove_id(self, id_: str):
-        """Remove request_id from the set
-
-        Parameters
-        ----------
-        id_ : str
-            request_id
-        """
-        self.ids.discard(id_)
-
-    def asdict(self, json_format: bool = False) -> dict:
-        """Convert to dictionary
-
-        Parameters
-        ----------
-        json_format : bool
-            If True, convert to dictionary for JSON format
-
-        Returns
-        -------
-        dict
-            Converted dictionary
-        """
-        if json_format:
-            return {"success": self.success,
-                    "ids": list(self.ids),
-                    "last_access": self.last_access}
-        return {"success": self.success,
-                "ids": self.ids,
-                "last_access": self.last_access}
-
-    @property
-    def is_empty(self) -> bool:
-        """Check if the set of request_id is empty
-
-        Returns
-        -------
-        bool
-            True if the set is empty, otherwise False
-        """
-        return not bool(self.ids)
+from jobcan_di.gateway import FormOutline
 
 
 
@@ -205,31 +129,31 @@ class JobcanTempDataIO(TempDataIO):
         self._form_outline_tmp_file = "form_outline_temp.json"
         """temporary file name for form outline"""
 
-    def save_form_outline(self, data: Dict[int, TempFormOutline]):
+    def save_form_outline(self, data: Dict[int, FormOutline]):
         """Save form outline to temporary file
 
         Parameters
         ----------
         data : dict
             Form outline data.
-            Key: form_id, Value: TempFormOutline
+            Key: form_id, Value: FormOutline
         """
         j_data = {k: v.asdict(json_format=True) for k, v in data.items()}
         self._save_files(j_data, self._form_outline_tmp_file)
 
 
-    def load_form_outline(self) -> Dict[int, TempFormOutline]:
+    def load_form_outline(self) -> Dict[int, FormOutline]:
         """Load form outline from temporary file
 
         Returns
         -------
         dict
             Form outline data.
-            Key: form_id, Value: TempFormOutline
+            Key: form_id, Value: FormOutline
         """
         j_data = self._load_files(self._form_outline_tmp_file)
 
-        return {int(k): TempFormOutline(**v) for k, v in j_data.items()}
+        return {int(k): FormOutline(**v) for k, v in j_data.items()}
 
     def _remove_files(self):
         """Remove temporary files if they are in the initial state

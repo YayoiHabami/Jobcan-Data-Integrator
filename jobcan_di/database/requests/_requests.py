@@ -10,6 +10,7 @@ Target
 ------
 - `/v1/requests/{request_id}` API (GET)
 """
+from enum import Enum
 import json
 import sqlite3
 from typing import Optional, Literal, Union
@@ -197,16 +198,30 @@ def retrieve(cursor:sqlite3.Cursor,
 
     return j_data
 
+
+class RequestStatus(Enum):
+    """Request status (`status` field in the `requests` table).
+
+    - `IN_PROGRESS`
+    - `COMPLETED`
+    - `REJECTED`
+    - `CANCELED`
+    - `RETURNED`
+    - `CANCELED_AFTER_COMPLETION`
+    """
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    REJECTED = "rejected"
+    CANCELED = "canceled"
+    RETURNED = "returned"
+    CANCELED_AFTER_COMPLETION = "canceled_after_completion"
+
 def retrieve_ids(
         cursor:sqlite3.Cursor,
         form_id: Union[int, str],
         *,
-        status: Optional[set[Literal["in_progress", "completed",
-                                     "rejected", "canceled", "returned",
-                                     "canceled_after_completion"]]] = None,
-        ant_status: Optional[set[Literal["in_progress", "completed",
-                                         "rejected", "canceled", "returned",
-                                         "canceled_after_completion"]]] = None
+        status: Optional[set[RequestStatus]] = None,
+        ant_status: Optional[set[RequestStatus]] = None
     ) -> list[str]:
     """Retrieve request IDs from the database.
 
@@ -226,10 +241,10 @@ def retrieve_ids(
     params = [form_id]
     if status is not None:
         query += " AND status IN (" + ", ".join("?" * len(status)) + ")"
-        params.extend(status)
+        params.extend(s.value for s in status)
     elif ant_status is not None:
         query += " AND status NOT IN (" + ", ".join("?" * len(ant_status)) + ")"
-        params.extend(ant_status)
+        params.extend(s.value for s in ant_status)
 
     cursor.execute(query, params)
 

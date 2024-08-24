@@ -6,11 +6,11 @@ import os
 import time
 
 from jobcan_di.integrator.integrator import JobcanDataIntegrator, JobcanDIConfig
-from jobcan_di.integrator.integrator_errors import RequestConnectionError, RequestReadTimeout
+from jobcan_di.status.errors import RequestConnectionError, RequestReadTimeout
 
 
 
-def main():
+def main() -> None:
     """
     アプリケーションのエントリーポイント
     """
@@ -29,5 +29,13 @@ def main():
                 until_dt = datetime.datetime.now() + datetime.timedelta(seconds=sleep_sec[0])
                 print(f"waiting {sleep_sec[0]} sec... (until {until_dt.strftime('%H:%M:%S')})")
                 time.sleep(sleep_sec.pop(0))
+            else:
+                # 上記以外のエラーの場合は終了
+                break
 
             err = di.restart()
+
+
+
+if __name__ == "__main__":
+    main()

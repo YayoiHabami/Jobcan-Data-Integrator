@@ -43,87 +43,28 @@ with JobcanDataIntegrator(config) as di:
     di.run()
 ```
 """
-import copy
-from dataclasses import dataclass, field
-import datetime
 import os
 import sqlite3
+import traceback
 from typing import Union, Optional, Tuple, Literal, Callable
 
-from requests import exceptions as req_ex
-
-from jobcan_di.database import (
-    forms as f_io,
-    group as g_io,
-    positions as p_io,
-    users as u_io,
-    requests as r_io
-)
-from .integrator_config import JobcanDIConfig, LogLevel
-from . import integrator_errors as ie
-from . import integrator_warnings as iw
-from .integrator_status import AppProgress, merge_status
-from ._json_data_io import save_response_to_json
-from ._logger import Logger
-from . import progress_status as ps
-from .progress_status import (
+from jobcan_di.gateway import JobcanApiClient, JobcanApiGateway, FormOutline
+from jobcan_di.status import AppProgress
+from jobcan_di.status import errors as ie
+from jobcan_di.status import progress as ps
+from jobcan_di.status.progress import (
     ProgressStatus,
     DetailedProgressStatus,
     InitializingStatus,
-    GetFormDetailStatus,
     TerminatingStatus,
     APIType
 )
-from ._tf_io import JobcanTempDataIO, TempFormOutline
-from .throttled_request import ThrottledRequests
+from jobcan_di.status import warnings as iw
+from .integrator_config import JobcanDIConfig, LogLevel
+from ._logger import Logger
+from ._tf_io import JobcanTempDataIO
 from ._toast_notification import ToastProgressNotifier
 
-
-
-@dataclass
-class APIResponse:
-    """
-    APIのレスポンスデータ
-
-    Attributes
-    ----------
-    results : list[dict]
-        レスポンスの結果を結合したもの。
-        - basic_data および form_outline の場合: `"results"` の内容を連結したもの
-    error : ie.JDIErrorData | iw.JDIWarningData | None
-        エラー/警告情報、エラー/警告が発生しなかった場合はNone
-    """
-    results: list[dict] = field(default_factory=list)
-    """レスポンスの結果を結合したもの"""
-    error: Union[ie.JDIErrorData, iw.JDIWarningData, None] = None
-    """エラー/警告情報、エラー/警告が発生しなかった場合はNone"""
-
-    @property
-    def success(self) -> bool:
-        """エラーが発生していないかどうか"""
-        return self.error is None
-
-
-UNIQUE_IDENTIFIER_KEYS = {
-    APIType.USER_V3: "user_code",
-    APIType.GROUP_V1: "group_code",
-    APIType.POSITION_V1: "position_code",
-    APIType.FORM_V1: "id",
-    APIType.REQUEST_OUTLINE: "id"
-}
-def get_unique_identifier(data:dict, api_type:APIType) -> Union[str, int, None]:
-    """APIの種類に応じたユニークな識別子を取得する
-
-    Parameters
-    ----------
-    data : dict
-        取得したデータ (APIレスポンスの`"results"`の各要素)
-    api_type : APIType
-        APIの種類
-    """
-    if api_type in UNIQUE_IDENTIFIER_KEYS:
-        return data.get(UNIQUE_IDENTIFIER_KEYS[api_type])
-    return None
 
 
 #
@@ -165,10 +106,16 @@ class JobcanDataIntegrator:
 
         # 変数の初期化
         self.app_id = "ジョブカン API"
-        self._headers = {}
-        """APIリクエストのヘッダ。トークンを含み、ヘッダが空でない場合はトークンが有効であることを示す"""
-        self._request = ThrottledRequests(self.config.requests_per_sec)
-        self._conn = None
+        if self.config.save_json:
+            client = JobcanApiClient(self.config.requests_per_sec,
+                                     base_url=self.config.base_url,
+                                     output_dir=self.config.json_dir,
+                                     output_as_json=False)  # TODO: コンフィグでDB保存を選択可能にする
+        else:
+            client = None
+        self._gateway = JobcanApiGateway(interval_seconds=self.config.requests_per_sec,
+                                         client=client)
+        """ジョブカンAPIとの通信・DBへのデータ保存を行うクラス"""
         self._logger = Logger(self.config.default_log_path)
         """ロガー"""
         self._notifier = ToastProgressNotifier(self.app_id,
@@ -193,10 +140,10 @@ class JobcanDataIntegrator:
         if (err:=self._initialize()):
             self.cancel(err)
 
-    def __enter__(self):
+    def __enter__(self) -> "JobcanDataIntegrator":
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, traceback_) -> None:
         self.cleanup()
 
     #
@@ -247,7 +194,7 @@ class JobcanDataIntegrator:
         except Exception as e:
             return ie.UnexpectedError(e)
 
-    def _init_logger(self):
+    def _init_logger(self) -> None:
         """ロガーの初期化 (出力先など)"""
         # 出力先の設定
         s = self._logger.init_logger(self.config.log_path, self.config.log_encoding,
@@ -263,7 +210,7 @@ class JobcanDataIntegrator:
         self._update_progress(ProgressStatus.INITIALIZING,
                               InitializingStatus.INIT_LOGGER, 1, 1)
 
-    def _init_progress_notification(self):
+    def _init_progress_notification(self) -> None:
         """進捗に関するトースト通知の初期化"""
         # 本アプリケーションに関するトースト通知を全て削除
         if self.config.clear_previous_notifications_on_startup:
@@ -277,7 +224,7 @@ class JobcanDataIntegrator:
         self._update_progress(ProgressStatus.INITIALIZING,
                               InitializingStatus.INIT_NOTIFICATION, 1, 1)
 
-    def _init_directories(self):
+    def _init_directories(self) -> None:
         """ディレクトリの初期化"""
         # DBファイルのディレクトリが存在しない場合は作成
         if not os.path.exists(os.path.dirname(self.config.db_path)):
@@ -316,10 +263,12 @@ class JobcanDataIntegrator:
                 err = ie.TokenMissingEnvEmpty()
             elif self.config.api_token_env not in os.environ:
                 err = ie.TokenMissingEnvNotFound(self.config.api_token_env)
+            else:
+                err = ie.TokenNotFoundError()
             return err
 
         # トークンの更新・有効性の確認
-        if (err:=self.update_token(token)) is not None:
+        if (err:=self._gateway.update_token(token)) is not None:
             # 指定されたトークンが無効な場合は終了
             return err
 
@@ -334,10 +283,8 @@ class JobcanDataIntegrator:
             os.makedirs(os.path.dirname(self.config.db_path))
 
         # データベースとの接続
-        try:
-            self._conn = sqlite3.connect(self.config.db_path)
-        except sqlite3.Error as e:
-            return ie.DatabaseConnectionFailed(e)
+        if (err := self._gateway.init_connection(self.config.db_path)):
+            return err
 
         # 進捗状況の更新
         self._update_progress(ProgressStatus.INITIALIZING,
@@ -345,52 +292,12 @@ class JobcanDataIntegrator:
 
     def _init_tables(self) -> Optional[ie.JDIErrorData]:
         """テーブルの初期化"""
-        f_io.create_tables(self._conn)
-        g_io.create_tables(self._conn)
-        p_io.create_tables(self._conn)
-        u_io.create_tables(self._conn)
-        r_io.create_tables(self._conn)
+        if (err := self._gateway.init_tables()):
+            return err
 
         # 進捗状況の更新
         self._update_progress(ProgressStatus.INITIALIZING,
                               InitializingStatus.INIT_DB_TABLES, 1, 1)
-
-    def update_token(self, token:str) -> Optional[ie.JDIErrorData]:
-        """トークンの更新および有効性の確認
-
-        Parameters
-        ----------
-        token : str
-            新しいAPIトークン
-
-        Returns
-        -------
-        Optional[ie.JDIErrorData]
-            トークンが無効な場合はエラー情報、それ以外はNone
-        """
-        headers = self._get_headers(token)
-
-        # トークンの有効性を確認
-        response = self._request.get(self.config.base_url+'/test/', headers=headers)
-        if response.status_code != 200:
-            # トークンが無効
-            return ie.TokenInvalid(token)
-
-        # トークンの更新
-        self._headers = headers
-        return None
-
-    def _get_headers(self, token:str) -> dict:
-        """ヘッダを取得する
-
-        Parameters
-        ----------
-        token : str
-            APIトークン"""
-        return {
-            'Authorization': f'Token {token}',
-            'Content-Type': 'application/json'
-        }
 
     def _update_progress(
             self,
@@ -481,12 +388,12 @@ class JobcanDataIntegrator:
             self._notifier.notify(title=self.app_id, body=message, level=level)
 
         # 通知を更新
-        if level == LogLevel.ERROR and self.config.clear_progress_on_error:
+        if isinstance(issue, ie.JDIErrorData) and self.config.clear_progress_on_error:
             self._notifier.update(status, issue, 0, 1)
 
         self.save_status()
 
-    def save_status(self):
+    def save_status(self) -> None:
         """アプリケーションの状態を保存する"""
         self.config.app_status.save()
 
@@ -523,7 +430,7 @@ class JobcanDataIntegrator:
     #
 
     @property
-    def progress(self) -> Tuple[ProgressStatus, DetailedProgressStatus]:
+    def progress(self) -> Tuple[ProgressStatus, Optional[DetailedProgressStatus]]:
         """進捗状況を取得する
 
         Returns
@@ -594,6 +501,7 @@ class JobcanDataIntegrator:
         # TODO: 前回 (_previous_status) と今回 (app_status) の進捗状況の統合
         # 統合したものをapp_statusのprogressとして更新・保存する
         # 現在は_previous_progressなので不要
+        self.save_status()
 
         self._is_canceled = True
         self._completed = False
@@ -615,11 +523,8 @@ class JobcanDataIntegrator:
             self.cancel(ie.NotInitializedError())
 
         # 基本データの取得
-        for api_type, update_func in [(APIType.USER_V3, u_io.update),
-                                      (APIType.GROUP_V1, g_io.update),
-                                      (APIType.POSITION_V1, p_io.update),
-                                      (APIType.FORM_V1, f_io.update)]:
-            if (err:=self._update_basic_data(api_type, update_func)):
+        for api_type in [APIType.USER_V3, APIType.GROUP_V1, APIType.POSITION_V1, APIType.FORM_V1]:
+            if (err:=self._update_basic_data(api_type)):
                 return self.cancel(err)
 
         # 申請書データ (概要) の取得
@@ -655,6 +560,9 @@ class JobcanDataIntegrator:
         try:
             self._run()
         except Exception as e:
+            tr = traceback.format_exc()
+            if self.config.logging_to_console:
+                print(tr)
             return self.cancel(ie.UnexpectedError(e))
 
     def restart(self) -> Optional[ie.JDIErrorData]:
@@ -694,11 +602,10 @@ class JobcanDataIntegrator:
 
         return self.run()
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         """終了処理"""
         # データベースとの接続を閉じる
-        if self._conn:
-            self._conn.close()
+        self._gateway.cleanup()
 
         # 全処理が正常に完了した場合、一時ファイルを削除
         if self._completed:
@@ -709,195 +616,6 @@ class JobcanDataIntegrator:
     #
     # 内部処理 (データ取得・更新等)
     #
-
-    def _fetch_data(self, url:str, api_type:APIType) -> APIResponse:
-        """APIを使用してデータを取得する
-
-        Parameters
-        ----------
-        url : str
-            APIのURL
-        api_type : APIType
-            取得するデータの種類
-
-        Returns
-        -------
-        APIResponse
-            取得したデータ、APIの種類などに関わらず.json()の内容を格納する
-        """
-        try:
-            res = self._request.get(url, headers=self._headers)
-
-            if res.status_code != 200:
-                # 正常なレスポンスが返ってこなかった場合
-                warning = iw.get_api_error(api_type, res.status_code, res, url)
-                self._update_issue(warning)
-                return APIResponse(error=warning)
-
-            # 正常なレスポンスが返ってきた場合
-            return APIResponse(results=[res.json()])
-        except req_ex.ConnectionError as e:
-            # 通信エラー
-            return APIResponse(error=ie.RequestConnectionError(e))
-        except req_ex.ReadTimeout as e:
-            # タイムアウト
-            return APIResponse(error=ie.RequestReadTimeout(e))
-
-    def _fetch_basic_data(
-                self,
-                api_type: APIType,
-                query: str = "",
-                skip_on_error: bool = False,
-                sub_count: int = 0,
-                sub_total_count: int = 0) -> APIResponse:
-        """
-        APIを使用してデータを取得する
-
-        Parameters
-        ----------
-        api_type : APIType
-            取得するデータの種類
-        query : str, default ""
-            クエリ文字列
-            例) "?form_id=1234" (申請書データ (概要))
-        skip_on_error : bool, default False
-            エラーが発生した場合にスキップするかどうか、Falseの場合は処理を終了する
-        sub_count : int, default 0
-            第2段階進捗に可算する値 -> _update_progress() に渡す
-        sub_total_count : int, default 0
-            第2段階進捗の全体数に可算する値 -> _update_progress() に渡す
-
-        Returns
-        -------
-        APIResponse
-            取得したデータ
-            エラーが発生した場合、または`skip_on_error`が`True`でエラーが発生した場合は
-            その時点でのデータを返す
-
-        Notes
-        -----
-        - この関数では申請書データ (詳細) は取得できません
-        """
-        assert api_type != APIType.REQUEST_DETAIL, "この関数では申請書データ (詳細) は取得できません"
-
-        url = self.config.api_base_url[api_type] + query
-        page_num = 1
-        self._update_progress(ps.get_progress_status(api_type),
-                              ps.get_detailed_progress_status(api_type),
-                              0, None, sub_count, sub_total_count)
-        result = APIResponse()
-        while True:
-            res = self._fetch_data(url, api_type)
-            res_j = res.results[0]
-            result.results.extend(res_j.get("results", []))
-
-            if isinstance(res.error, iw.JDIWarningData):
-                # 正常なレスポンスが返ってこなかった場合
-                result.error = res.error
-                if skip_on_error:
-                    # エラーが発生した場合にスキップする場合、現時点で取得したデータを返す
-                    return result
-                continue
-            elif isinstance(res.error, ie.JDIErrorData):
-                # 致命的なエラーが発生した場合
-                result.error = res.error
-                return result
-
-            if self.config.save_json:
-                save_response_to_json(res_j, api_type, page_num,
-                                      self.config.json_indent, self.config.json_dir,
-                                      self.config.json_encoding)
-
-            self._update_progress(ps.get_progress_status(api_type),
-                                  ps.get_detailed_progress_status(api_type),
-                                  len(result.results), res_j["count"],
-                                  sub_count, sub_total_count)
-
-            if not res_j['next']:
-                # 次のページが存在しない場合にループを抜ける
-                break
-            url = res_j['next']
-            page_num += 1
-
-        return result
-
-    def _fetch_form_outline_data(
-                self,
-                form_id: int,
-                applied_after: Optional[str] = None,
-                skip_on_error: bool = False,
-                include_cancel: bool = True,
-                sub_count: int = 0,
-                sub_total_count: int = 0
-        ) -> Tuple[TempFormOutline, Union[ie.JDIErrorData, iw.JDIWarningData, None]]:
-        """
-        APIを使用して申請書(概要)データを取得する
-
-        Parameters
-        ----------
-        api_type : APIType
-            取得するデータの種類
-        form_id : int
-            申請書データのID
-        applied_after : Optional[str], default None
-            申請日時のフィルタ、指定した日時以降のデータのみ取得する。
-            形式は "YYYY/MM/DD HH:MM:SS" (JST) で指定する。
-            例) "2021/01/01 00:00:00"
-        skip_on_error : bool, default False
-            エラーが発生した場合にスキップするかどうか、Falseの場合は処理を終了する
-        include_cancel : bool, default True
-            取得するデータにキャンセルされたデータを含めるかどうか、APIのデフォルトはFalse
-            これをFalseにした場合、独自の申請書ID (request_id) を採用している環境での通し番号の取得はできなくなる。
-        sub_count : int, default 0
-            第2段階進捗に可算する値 -> _update_progress() に渡す
-        sub_total_count : int, default 0
-            第2段階進捗の全体数に可算する値 -> _update_progress() に渡す
-
-        Returns
-        -------
-        TempFormOutline
-            取得したデータ、APIのレスポンスに失敗があったかを示す `.success` と、
-            取得した申請書データのIDのリスト `.ids` にのみ値が格納される
-        Union[ie.JDIErrorData, iw.JDIWarningData, None]
-            エラー/警告情報、エラー/警告が発生しなかった場合はNone
-        """
-        # クエリの作成
-        query = f"?form_id={form_id}"
-        if applied_after:
-            query += f"&applied_after={applied_after}"
-        if include_cancel:
-            query += "&include_canceled=true"
-
-        f_outline = self._fetch_basic_data(
-            APIType.REQUEST_OUTLINE,
-            query=query,
-            skip_on_error=skip_on_error,
-            sub_count=sub_count,
-            sub_total_count=sub_total_count
-        )
-
-        return TempFormOutline(
-            success = f_outline.success,
-            ids = [res["id"] for res in f_outline.results]
-        ), f_outline.error
-
-    def _fetch_form_detail_data(self, request_id: str) -> APIResponse:
-        """APIを使用して申請書(詳細)データを取得する
-
-        Parameters
-        ----------
-        request_id : str
-            申請書データのID
-
-        Returns
-        -------
-        APIResponse
-            取得したデータ
-        """
-        return self._fetch_data(
-            url = self.config.api_base_url[APIType.REQUEST_DETAIL] + f"{request_id}/",
-            api_type = APIType.REQUEST_DETAIL
-        )
 
     def _update_data(
             self, update_func: Callable[[sqlite3.Connection, dict], None],
@@ -937,9 +655,8 @@ class JobcanDataIntegrator:
 
     def _update_basic_data(
             self,
-            api_type: Literal[APIType.USER_V3, APIType.GROUP_V1, APIType.POSITION_V1,
-                              APIType.FORM_V1],
-            update_func: Callable[[sqlite3.Connection, dict], None]
+            api_type: Literal[APIType.USER_V3, APIType.GROUP_V1,
+                              APIType.POSITION_V1, APIType.FORM_V1]
     ) -> Optional[ie.JDIErrorData]:
         """基本データの取得＆更新
 
@@ -947,9 +664,6 @@ class JobcanDataIntegrator:
         ----------
         api_type : APIType
             取得するデータの種類
-        update_func : function
-            更新処理を行う関数、引数は (conn, data)
-            u_io.update, g_io.update, p_io.update, f_io.update のいずれか
 
         Returns
         -------
@@ -960,26 +674,18 @@ class JobcanDataIntegrator:
             # 前回処理済みorキャンセルorエラーの場合はスキップ
             return
 
-        # データ取得
-        data = self._fetch_basic_data(api_type)
-        if isinstance(data.error, ie.JDIErrorData):
-            # エラーが発生した場合は処理を終了
-            return data.error
-        elif isinstance(data.error, iw.JDIWarningData):
-            # 警告が発生した場合はログに記録 (処理は続行)
-            self.config.app_status.fetch_failure_record.is_failed(api_type, True)
-
-        # データをデータベースに保存
-        for res in data.results:
-            err = self._update_data(update_func, res, api_type)
-            if isinstance(err, ie.JDIErrorData):
-                # エラーが発生した場合は処理を終了
-                return err
-            elif isinstance(err, iw.JDIWarningData):
-                # 更新に失敗した場合、app_statusに保存失敗として記録 (処理は続行)
-                self.config.app_status.db_save_failure_record.add(
-                    api_type, get_unique_identifier(res, api_type)
-                )
+        err, r_suc, d_uid = self._gateway.update_basic_data(
+            api_type, issue_callback=self._update_issue,
+            progress_callback=lambda a, c, t: self._update_progress(
+                ps.get_progress_status(a), ps.get_detailed_progress_status(a), c, t, 0, 0
+            )
+        )
+        # データ取得に成功したか否かをapp_statusに記録
+        self.config.app_status.fetch_failure_record.is_failed(api_type, not r_suc)
+        # データ更新に失敗したデータの識別子をapp_statusに記録
+        if d_uid:
+            self.config.app_status.db_save_failure_record.add(api_type, set(d_uid))
+        return err
 
     def _update_form_outline(self) -> Optional[ie.JDIErrorData]:
         """申請書データ (概要) の取得＆更新
@@ -997,135 +703,139 @@ class JobcanDataIntegrator:
             # 前回処理済みorキャンセルorエラーの場合はスキップ
             return
 
+        # 除外対象のrequest_idを取得
+        # 前回の進捗状況が申請書データ (概要) の取得である場合、取得に成功したデータを除外
+        # ただし除外対象から前回取得に失敗したデータは除外 (再取得を試みる)
+        ignore = set()
+        if (self._previous_progress.get()[1]
+                == ps.get_detailed_progress_status(APIType.REQUEST_OUTLINE)):
+            ignore = {str(i) for i in self._previous_progress.specifics}
+        ignore -= self.config.app_status.fetch_failure_record.get(APIType.REQUEST_OUTLINE)
+
         # 申請書データ (概要) 取得
-        failed_ids = self.config.app_status.fetch_failure_record.get(APIType.REQUEST_OUTLINE)
-        ids = f_io.retrieve_form_ids(self._conn)
-        tmp_data = self._tmp_io.load_form_outline()
-        self._update_progress(ProgressStatus.FORM_OUTLINE,
-                                ps.GetFormOutlineStatus.GET_OUTLINE, 0, None)
-
-        # 取得開始日時を設定
-        for i, form_id in enumerate(ids):
-            if (form_id not in failed_ids
-                and not self._previous_progress.is_future_process(APIType.REQUEST_OUTLINE,
-                                                                    specific = form_id)):
-                # 前回の取得に失敗しておらず、前回取得済みの場合はスキップ
-                # NOTE: .is_future_processにより、form_idとrequest_id等とが偶発的に一致した場合の判定を除外
-                self.config.app_status.progress.add_specifics(form_id)
-                self._update_progress(ProgressStatus.FORM_OUTLINE,
-                                        ps.GetFormOutlineStatus.GET_OUTLINE,
-                                        1, 1, i+1, len(ids))
-                continue
-
-            # 取得開始時刻を記録し、データ取得開始
-            last_access = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
-            # 前回の取得日時が存在する場合はそれを適用 (applied_after)
-            f_outline, err = self._fetch_form_outline_data(
-                form_id = form_id,
-                applied_after = self.config.app_status.form_api_last_access.get(form_id, None),
-                sub_count = i+1,
-                sub_total_count = len(ids)
+        forms: dict[int, FormOutline] = dict()
+        err = self._gateway.get_form_outline(
+            applied_after=self.config.app_status.form_api_last_access,
+            ignore=ignore, issue_callback=self._update_issue,
+            progress_callback=lambda a, c, t, sc, st: self._update_progress(
+                ps.get_progress_status(a), ps.get_detailed_progress_status(a), c, t, sc, st
+            ),
+            id_progress_callback=lambda s, fid, la, fs=forms: self._fid_progress_callback(
+                s, fid, la, fs
             )
-            if isinstance(err, ie.JDIErrorData):
-                # エラーが発生した場合は処理を終了
-                return err
-            elif isinstance(err, iw.JDIWarningData):
-                # 更新に失敗した場合（取得できなかったrequest_idがある場合）
-                # app_statusに取得失敗として記録 (処理は続行)
-                self.config.app_status.fetch_failure_record.add(APIType.REQUEST_OUTLINE,
-                                                                target = form_id)
-            succeeded &= f_outline.success
+        )
 
-            # 申請書データ (概要) を一時ファイルに保存
-            # 成否にかかわらず、取得したデータは一時ファイルに保存
-            if form_id not in tmp_data:
-                tmp_data[form_id] = f_outline
-            else:
-                tmp_data[form_id].add_ids(f_outline.ids)
+        return err
 
-            if f_outline.success:
-                # 今回の更新に成功した場合、成否フラグと最終アクセス日時を更新
-                tmp_data[form_id].success = True
-                tmp_data[form_id].last_access = last_access
-            # NOTE: 新規記録対象が10000件程度でも保存にかかる時間は0.1s程度のため、毎回直接保存する
-            self._tmp_io.save_form_outline(tmp_data)
+    def _fid_progress_callback(self,
+                              stat:Literal["fetch-failure", "success"],
+                              form_id:int,
+                              f_outline:Optional[FormOutline]=None,
+                              last_access:Optional[str]=None,
+                              forms:Optional[dict[int, FormOutline]]=None) -> None:
+        """申請書データ (概要) 取得の進捗状況を更新する
 
-            # 進捗状況を更新 (一時ファイルへの保存が完了した時点でform_idをspecificsに追加)
+        Parameters
+        ----------
+        stat : Literal["fetch-failure", "success"]
+            進捗状況
+        form_id : int
+            申請書ID
+        f_outline : Optional[FormOutline]
+            申請書データ (概要)
+        last_access : Optional[str]
+            最終アクセス日時
+        forms : Optional[dict[int, FormOutline]]
+            申請書データ (概要)、取得したデータを一時保存する場合に使用
+        """
+        if stat == "fetch-failure":
+            # APIからのデータ取得に失敗した場合はapp_statusへの記録のみ行う
+            self.config.app_status.fetch_failure_record.add(
+                APIType.REQUEST_OUTLINE, target=str(form_id)
+            )
+            return
+        elif stat == "success":
             self.config.app_status.progress.add_specifics(form_id)
 
-    def _update_form_detail(self) -> bool:
+        if forms is None or f_outline is None or last_access is None:
+            # forms, f_outline, last_accessが指定されていない (->"fetch-failure") 場合は
+            # 以下の処理を行わない
+            return
+
+        # 取得したデータを記録
+        if form_id not in forms:
+            forms[form_id] = f_outline
+        else:
+            forms[form_id].add_ids(f_outline.ids)
+        if f_outline.success:
+            # 取得に成功した場合、最終アクセス日時を更新
+            forms[form_id].last_access = last_access
+
+        # 一時ファイルに保存
+        self._tmp_io.save_form_outline(forms)
+
+    def _update_form_detail(self) -> Optional[ie.JDIErrorData]:
         """申請書データ (詳細) の取得＆更新"""
         if not self._is_future_progress(APIType.REQUEST_DETAIL):
             # 申請書データ (詳細) の取得をスキップ
-            return True
+            return
 
-        # 一時ファイルの読み込み
-        self._update_progress(ProgressStatus.FORM_DETAIL,
-                              GetFormDetailStatus.SEEK_TARGET, 0, None)
-        tmp_data = self._tmp_io.load_form_outline()
+        forms = self._tmp_io.load_form_outline()
 
-        for i, item in enumerate(tmp_data.items()):
-            form_id, data = item
-            # 取得対象のrequest_idを取得 (データはtmp_dataの増減により変動するため、コピーを作成)
-            target_ids = copy.copy(data.ids)
-            # 更新されうるデータのIDを取得 (i.e. "in_progress", "returned"; 今後の拡張に備えて以下のように記述)
-            target_ids.update(r_io.retrieve_ids(self._conn.cursor(), form_id,
-                                                ant_status = ["completed", "rejected",
-                                                              "canceled",
-                                                              "canceled_after_completion"]))
-            # 前回の取得に失敗したデータを取得対象に追加
-            failed_ids = self.config.app_status.fetch_failure_record.get(APIType.REQUEST_DETAIL,
-                                                                         form_id = form_id)
-            target_ids.update(failed_ids)
+        ignore = set()
+        if (self._previous_progress.get()[1]
+                == ps.get_detailed_progress_status(APIType.REQUEST_DETAIL)):
+            ignore = {str(i) for i in self._previous_progress.specifics}
+        # TODO: ignoreから一部除外 (前回取得に失敗したデータは再取得を試みる)
 
-            for j, request_id in enumerate(target_ids):
-                if (request_id not in failed_ids
-                    and not self._previous_progress.is_future_process(APIType.REQUEST_DETAIL,
-                                                                      specific = request_id)):
-                    # 前回の取得に失敗しておらず、前回取得済みの場合はスキップ
-                    # NOTE: .is_future_processにより、form_idとrequest_id等とが偶発的に一致した場合の判定を除外
-                    self.config.app_status.progress.add_specifics(request_id)
-                    self._update_progress(ProgressStatus.FORM_DETAIL,
-                                          ps.GetFormDetailStatus.GET_DETAIL,
-                                          1, 1, i+1, len(tmp_data)-1)
-                    continue
+        # 申請書データ (詳細) 取得
+        err = self._gateway.update_form_detail(
+            forms, ignore=ignore, issue_callback=self._update_issue,
+            progress_callback=lambda a, c, t, sc, st: self._update_progress(
+                ps.get_progress_status(a), ps.get_detailed_progress_status(a), c, t, sc, st
+            ),
+            id_progress_callback=lambda s, fid, rid, fs=forms: self._rid_progress_callback(
+                s, fid, rid, fs
+            )
+        )
 
-                # 申請書データ (詳細) 取得
-                res = self._fetch_form_detail_data(request_id)
-                if isinstance(res.error, ie.JDIErrorData):
-                    # エラーが発生した場合は処理を終了
-                    return res.error
-                elif isinstance(res.error, iw.JDIWarningData):
-                    # 正常なレスポンスが返ってこなかった場合app_statusに取得失敗として記録
-                    self.config.app_status.fetch_failure_record.add(APIType.REQUEST_DETAIL,
-                                                                    target = request_id,
-                                                                    form_id = form_id)
-                    continue
+        return err
 
-                # 申請書データ (詳細) をデータベースに保存
-                err = self._update_data(r_io.update, res.results[0], APIType.REQUEST_DETAIL)
-                if isinstance(err, ie.JDIErrorData):
-                    # エラーが発生した場合は処理を終了
-                    return err
-                elif isinstance(err, iw.JDIWarningData):
-                    # 保存に失敗した場合app_statusに保存失敗として記録 (処理は続行)
-                    self.config.app_status.db_save_failure_record.add(APIType.REQUEST_DETAIL,
-                                                                      request_id, form_id=form_id)
+    def _rid_progress_callback(self,
+                               stat:Literal["fetch-failure", "save-failure",
+                                                "success-req", "success-form"],
+                               form_id:int,
+                               request_id:Optional[str]=None,
+                               forms:Optional[dict[int, FormOutline]]=None) -> None:
+        """申請書データ (詳細) 取得の進捗状況を更新する
 
-                # 進捗を更新
-                self._update_progress(ProgressStatus.FORM_DETAIL,
-                                      ps.get_detailed_progress_status(APIType.REQUEST_DETAIL),
-                                      j+1, len(target_ids),
-                                      i+1, len(tmp_data)-1)
+        Parameters
+        ----------
+        stat : Literal["fetch-failure", "save-failure", "success-req", "success-form"]
+            進捗状況
+        form_id : int
+            申請書ID
+        request_id : Optional[str]
+            申請ID
+        forms : Optional[dict[int, FormOutline]]
+            申請書データ (概要)、取得したデータを一時保存する場合に使用
+        """
+        if forms is None:
+            forms = dict()
 
-                # 一時ファイルから取得に成功したrequest_idを削除
-                tmp_data[form_id].remove_id(request_id)
-                self._tmp_io.save_form_outline(tmp_data)
+        if request_id is None:
+            if stat == "success-form" and form_id in forms:
+                self.config.app_status.form_api_last_access[form_id] = forms[form_id].last_access
+            return
 
-                # app_statusに取得成功として記録
-                self.config.app_status.progress.add_specifics(request_id)
-
-            # 各form_idについて申請書(詳細)の取得が完了した場合、app_statusの最終アクセス日時を更新
-            self.config.app_status.form_api_last_access[form_id] = data.last_access
-
-        return True
+        if stat == "fetch-failure":
+            self.config.app_status.fetch_failure_record.add(
+                APIType.REQUEST_DETAIL, form_id=form_id, target={request_id})
+        elif stat == "save-failure":
+            self.config.app_status.db_save_failure_record.add(
+                APIType.REQUEST_DETAIL, form_id=form_id, target={request_id})
+        elif stat == "success-req":
+            self.config.app_status.progress.add_specifics(request_id)
+            # 一時ファイルを更新
+            forms[form_id].remove_id(request_id)
+            self._tmp_io.save_form_outline(forms)

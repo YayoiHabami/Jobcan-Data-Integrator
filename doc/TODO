@@ -50,6 +50,7 @@ integrator:
         ☐ `null`になりえる全データについて、それがなくなった場合の処理
         ☐ 差分更新の実装
         ✔ 申請書データ(概要)の取得に際して、`form_id`の時期条件を設定可能にする @done(24-08-18 16:53)
+        ☐ `JobcanDataIntegrator`から`._fetch_xxx`と`._update_xxx`を分離する
     データ管理:
         ☐ データが減少した場合の処理
     進捗管理:
@@ -125,7 +126,7 @@ integrator:
             ✔ 各formの更新要素の取得に失敗した場合、その旨をapp_statusに記録する @done(24-08-20 15:30)
                 ✔ 一つでも取得ミスがあればその取得は失敗となるよう`._fetch_form_outline_data`を変更する @done(24-08-20 15:20)
                 ✔ 取得に失敗した場合、一時ファイルへの保存時に"success"はFalseとし、"lastAccess"を更新しないようにする @done(24-08-20 15:25)
-            ☐ `&completed_after=lastAccess&status=canceled_after_completion`である要素を取得するようにする
+            ✔ `&completed_after=lastAccess&status=canceled_after_completion`である要素を取得するようにする @done(24-08-24 23:26)
             ☐ `._update_form_outline`の`._update_progress`をまとめる
             ☐ `._update_form_outline`の`.config.app_status.progress.add_specifics`をまとめる
         FORM_DETAIL:
