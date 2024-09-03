@@ -142,7 +142,7 @@ class JobcanApiClient:
         if json_output_dir is not None:
             self._json_output_dir = json_output_dir
 
-        if json_indent >= 0:
+        if json_indent is not None and json_indent >= 0:
             self._json_indent = json_indent
         else:
             self._json_indent = None
@@ -259,17 +259,18 @@ class JobcanApiClient:
 
         try:
             res = self._requests.get(url, headers=self._headers)
+            j_res = res.json()
 
             if res.status_code != 200:
                 # 正常なレスポンスが返ってこなかった場合
-                warning = iw.get_api_error(api_type, res.status_code, res, url)
+                warning = iw.get_api_error(api_type, res.status_code, j_res, url)
                 if issue_callback is not None:
                     # 警告を発行
                     issue_callback(warning)
                 return ApiResponse(error=warning)
 
             # 正常なレスポンスが返ってきた場合
-            return ApiResponse(results=[res.json()])
+            return ApiResponse(results=[j_res])
         except req_ex.ConnectionError as e:
             # 通信エラー
             return ApiResponse(error=ie.RequestConnectionError(e))
@@ -280,7 +281,8 @@ class JobcanApiClient:
     def fetch_basic_data(
             self,
             api_type: Literal[APIType.USER_V3, APIType.GROUP_V1,
-                              APIType.POSITION_V1, APIType.FORM_V1],
+                              APIType.POSITION_V1, APIType.FORM_V1,
+                              APIType.REQUEST_OUTLINE],
             query: str = "",
             return_on_error: bool = False,
             *,
@@ -308,7 +310,8 @@ class JobcanApiClient:
         """
         url = f"{self._api_base_url[api_type]}{query}"
         page_num = 1
-        progress_callback(api_type, 0, None)
+        if progress_callback:
+            progress_callback(api_type, 0, None)
 
         result = ApiResponse()
         while True:
@@ -328,7 +331,8 @@ class JobcanApiClient:
             res_j = res.results[0]
             result.results.extend(res_j.get("results", []))
             self._save_as_json(api_type, res_j, page = page_num)
-            progress_callback(api_type, len(result.results), res_j["count"])
+            if progress_callback:
+                progress_callback(api_type, len(result.results), res_j["count"])
 
             if not res_j["next"]:
                 # 次のページがない場合は終了
@@ -380,6 +384,11 @@ class JobcanApiClient:
             取得した申請書データのIDのリスト `.ids` にのみ値が格納される
         Union[ie.JDIErrorData, iw.JDIWarningData, None]
             エラー/警告情報、エラー/警告が発生しなかった場合はNone
+
+        Notes
+        -----
+        - 申請日時のフィルタは、指定した日時以降に申請されたデータ (applied_date) のみ取得する。
+        - 申請日時のフィルタが指定されている場合、前回取得したデータの最終申請日時以降のデータ (final_approved_date) も取得する。
         """
         query = f"?form_id={form_id}"
         if applied_after:
@@ -391,11 +400,25 @@ class JobcanApiClient:
                                           return_on_error=return_on_error,
                                           issue_callback=issue_callback,
                                           progress_callback=progress_callback)
+        fo = FormOutline(success=f_outline.success,
+                         ids= [res["id"] for res in f_outline.results]
+        )
+        if f_outline.error:
+            return fo, f_outline.error
 
-        return FormOutline(
-            success=f_outline.success,
-            ids= [res["id"] for res in f_outline.results]
-        ), f_outline.error
+        if applied_after:
+            # applied_afterが指定されている場合は、前回以降にキャンセルされたデータも取得する
+            # NOTE: completed_after は final_approved_date に相当する
+            query2 = f"?form_id={form_id}&include_canceled=true&status=canceled_after_completion" \
+                     f"&completed_after={applied_after}"
+            f_outline2 = self.fetch_basic_data(APIType.REQUEST_OUTLINE, query=query2,
+                                               return_on_error=return_on_error,
+                                               issue_callback=issue_callback,
+                                               progress_callback=progress_callback)
+            fo.add_ids([res["id"] for res in f_outline2.results])
+            f_outline.error = f_outline2.error
+
+        return fo, f_outline.error
 
     def fetch_form_detail(
             self, request_id: str, *,

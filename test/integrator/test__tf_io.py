@@ -8,25 +8,26 @@ from tempfile import mkdtemp
 import pytest
 
 # Assuming the module is named temp_file_io.py
-from jobcan_di.integrator._tf_io import TempFormOutline, TempDataIO, JobcanTempDataIO
+from jobcan_di.gateway import FormOutline
+from jobcan_di.integrator._tf_io import TempDataIO, JobcanTempDataIO
 
 
 
-class TestTempFormOutline:
+class TestFormOutline:
     def test_init(self):
-        form = TempFormOutline(success=True, ids=["1", "2"], last_access="2024-08-19")
+        form = FormOutline(success=True, ids=["1", "2"], last_access="2024-08-19")
         assert form.success is True
         assert form.ids == {"1", "2"}
         assert form.last_access == "2024-08-19"
 
     def test_add_ids(self):
-        form = TempFormOutline()
+        form = FormOutline()
         form.add_ids(["1", "2"])
         form.add_ids(["2", "3"])
         assert form.ids == {"1", "2", "3"}
 
     def test_asdict(self):
-        form = TempFormOutline(success=True, ids=["1", "2"], last_access="2024-08-19")
+        form = FormOutline(success=True, ids=["1", "2"], last_access="2024-08-19")
         assert form.asdict() == {
             "success": True,
             "ids": {"1", "2"},
@@ -39,7 +40,7 @@ class TestTempFormOutline:
         assert fj["last_access"] == "2024-08-19"
 
     def test_is_empty(self):
-        form = TempFormOutline()
+        form = FormOutline()
         assert form.is_empty is True
         form.add_ids(["1"])
         assert form.is_empty is False
@@ -72,8 +73,8 @@ class TestJobcanTempDataIO:
         jobcan_io = JobcanTempDataIO(temp_dir, prioritize_memory=prioritize_memory)
 
         data = {
-            1: TempFormOutline(success=True, ids=["1", "2"], last_access="2024-08-19"),
-            2: TempFormOutline(success=False, ids=["3", "4"], last_access="2024-08-20")
+            1: FormOutline(success=True, ids=["1", "2"], last_access="2024-08-19"),
+            2: FormOutline(success=False, ids=["3", "4"], last_access="2024-08-20")
         }
         jobcan_io.save_form_outline(data)
 
@@ -93,7 +94,7 @@ class TestJobcanTempDataIO:
         assert os.path.exists(os.path.join(temp_dir, "temp"))
 
         # ファイルのデータが空でない場合、ディレクトリは削除されない
-        jobcan_io.save_form_outline({1: TempFormOutline(ids=["1"])})
+        jobcan_io.save_form_outline({1: FormOutline(ids=["1"])})
         jobcan_io.cleanup()
         if prioritize_memory:
             assert not os.path.exists(os.path.join(temp_dir, "temp"))
@@ -101,7 +102,7 @@ class TestJobcanTempDataIO:
             assert os.path.exists(os.path.join(temp_dir, "temp"))
 
         # ファイルのデータが空の場合、ディレクトリが削除される
-        jobcan_io.save_form_outline({1: TempFormOutline()})
+        jobcan_io.save_form_outline({1: FormOutline()})
         jobcan_io.cleanup()
         assert not os.path.exists(os.path.join(temp_dir, "temp"))
 

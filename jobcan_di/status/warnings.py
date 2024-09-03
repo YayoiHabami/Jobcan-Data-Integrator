@@ -46,7 +46,7 @@ class JDIWarningData(metaclass=ABCMeta):
             例外、エラーメッセージ、エラー情報
             dictの場合は、エラー情報を格納した辞書
         """
-        self.details: dict = {}
+        self.details: Dict[str, Optional[str]] = {}
 
         if isinstance(e, str):
             e_name = "UnexpectedError"
@@ -58,6 +58,9 @@ class JDIWarningData(metaclass=ABCMeta):
             e_name = e.get("exception_name", "UnexpectedError")
             e_args = e.get("args", "")
             self._details = e
+        else:
+            e_name = None
+            e_args = None
 
         self._details["e"] = {
             "exception_name": e_name,
@@ -512,7 +515,7 @@ class DBUpdateFailed(JDIWarningData):
 # JSONとの変換
 #
 
-_class_registry: Dict[str, JDIWarningData] = {
+_class_registry: Dict[str, type[JDIWarningData]] = {
     "UnexpectedWarning": UnexpectedWarning,
     "InvalidConfigFilePath": InvalidConfigFilePath,
     "InvalidStatusFilePath": InvalidStatusFilePath,

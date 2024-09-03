@@ -432,7 +432,7 @@ class ApiClientNotPrepared(JDIErrorData):
 # JSONとの変換
 #
 
-_class_registry: Dict[str, JDIErrorData] = {
+_class_registry: Dict[str, type[JDIErrorData]] = {
     "TokenMissingEnvEmpty": TokenMissingEnvEmpty,
     "TokenMissingEnvNotFound": TokenMissingEnvNotFound,
     "TokenInvalid": TokenInvalid,
