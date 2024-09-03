@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Iterable, Optional, Union
 
 from jobcan_di.status.errors import JDIErrorData
+from jobcan_di.status.progress import APIType
 from jobcan_di.status.warnings import JDIWarningData
 
 @dataclass
@@ -96,6 +97,16 @@ class FormOutline:
         """
         self.ids.discard(id_)
 
+    def remove_ids(self, ids: Iterable[str]):
+        """request_idをセットから削除
+
+        Parameters
+        ----------
+        ids : Iterable[str]
+            request_idのリストやセット
+        """
+        self.ids.difference_update(ids)
+
     def asdict(self, json_format: bool = False) -> dict:
         """辞書に変換
 
@@ -127,3 +138,25 @@ class FormOutline:
             空の場合はTrue
         """
         return not bool(self.ids)
+
+UNIQUE_IDENTIFIER_KEYS = {
+    APIType.USER_V3: "user_code",
+    APIType.GROUP_V1: "group_code",
+    APIType.POSITION_V1: "position_code",
+    APIType.FORM_V1: "id",
+    APIType.REQUEST_OUTLINE: "id"
+}
+"""APIの種類に応じたユニークな識別子のキー"""
+def get_unique_identifier(data:dict, api_type:APIType) -> Union[str, int, None]:
+    """APIの種類に応じたユニークな識別子を取得する
+
+    Parameters
+    ----------
+    data : dict
+        取得したデータ (APIレスポンスの`"results"`の各要素)
+    api_type : APIType
+        APIの種類
+    """
+    if api_type in UNIQUE_IDENTIFIER_KEYS:
+        return data.get(UNIQUE_IDENTIFIER_KEYS[api_type])
+    return None

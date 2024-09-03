@@ -23,6 +23,10 @@ Functions (sub)
 - `retrieve_default_attachment_files`: Retrieve default attachment files data
 - `retrieve_ids`: Retrieve request IDs from `requests` table
 
+Classes
+---------
+- `RequestStatus`: Enum class for request status (`status` field in the response)
+
 Usage
 ------
 1. Create tables in the database
@@ -67,4 +71,4 @@ from ._approval_process import retrieve_approval_process
 from ._viewers import retrieve_viewers
 from ._modify_logs import retrieve_modify_logs
 from ._default_attachment_files import retrieve_default_attachment_files
-from ._requests import update, retrieve, retrieve_ids
+from ._requests import update, retrieve, retrieve_ids, RequestStatus

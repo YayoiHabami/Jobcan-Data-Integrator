@@ -59,3 +59,14 @@ class ThrottledRequests:
         self.last_request_time = time.perf_counter()
 
         return response
+
+    def update_interval(self, interval_seconds: float):
+        """
+        リクエスト間隔を更新する
+
+        Parameters
+        ----------
+        interval_seconds : float
+            リクエスト間隔（秒）
+        """
+        self._interval_seconds = interval_seconds

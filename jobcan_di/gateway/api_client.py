@@ -74,7 +74,7 @@ class JobcanApiClient:
     """
 
     def __init__(self,
-                 interval_seconds: int,
+                 interval_seconds: float,
                  *,
                  base_url = "https://ssl.wf.jobcan.jp/wf_api",
                  api_suffix: Optional[Dict[APIType, str]] = None,
@@ -178,6 +178,16 @@ class JobcanApiClient:
         self._headers = headers
         self._is_token_verified = True
         return None
+
+    def update_interval(self, interval_seconds: int) -> None:
+        """リクエスト間隔の更新
+
+        Parameters
+        ----------
+        interval_seconds : int
+            リクエスト間隔 (秒)
+        """
+        self._requests.update_interval(interval_seconds)
 
     #
     # プロパティ

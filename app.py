@@ -6,11 +6,11 @@ import os
 import time
 
 from jobcan_di.integrator.integrator import JobcanDataIntegrator, JobcanDIConfig
-from jobcan_di.integrator.integrator_errors import RequestConnectionError, RequestReadTimeout
+from jobcan_di.status.errors import RequestConnectionError, RequestReadTimeout
 
 
 
-def main():
+def main() -> None:
     """
     アプリケーションのエントリーポイント
     """

@@ -16,6 +16,14 @@ Classes
 - `ApiUnexpectedError` : APIの予期しないエラーが発生した場合のエラー情報
 - `UnexpectedError` : 未知のエラーが発生した場合のエラー情報
 
+Classes (DeveloperErrorData)
+---------------------------
+- `DeveloperErrorData` : 開発者側に問題がある場合のエラー情報 (抽象クラス)
+- `NotInitializedError` : 初期化されていない場合のエラー情報 (開発者エラー)
+- `ApiClientNotPrepared` : APIクライアントが準備されていない場合のエラー情報 (開発者エラー)
+- `DatabaseConnectionNotPrepared` : データベース接続が準備されていない場合のエラー情報 (開発者エラー)
+- `DatabaseNotPrepared` : データベースが準備されていない場合のエラー情報 (開発者エラー)
+
 Functions
 ---------
 - `get_api_error` : APIエラー情報の取得
@@ -139,6 +147,12 @@ class UnexpectedError(JDIErrorData):
 # トークン
 #
 
+class TokenNotFoundError(JDIErrorData):
+    """トークンが指定されていない場合のエラー情報"""
+    def error_message(self) -> str:
+        return "トークンが指定されていません。API_TOKEN にトークンを指定するか、" \
+               "TOKEN_ENV_NAME にトークンを記録している環境変数名を指定して下さい。"
+
 class TokenMissingEnvEmpty(JDIErrorData):
     """トークン取得先の環境変数名が指定されていない場合のエラー情報"""
     def error_message(self) -> str:
@@ -196,6 +210,15 @@ class DatabaseConnectionFailed(JDIErrorData):
         else:
             return "データベースへの接続に失敗しました。"
 
+class DatabaseTableCreationFailed(JDIErrorData):
+    """データベースのテーブル作成に失敗した場合のエラー情報"""
+
+    def error_message(self) -> str:
+        if self.exception_name:
+            return f"データベースのテーブル作成に失敗しました: " \
+                   f"{self.exception_name}: {self.args}"
+        else:
+            return "データベースのテーブル作成に失敗しました。"
 
 
 #
@@ -415,17 +438,47 @@ def get_api_error(api_type:APIType,
 
 #
 # 処理中のエラー
+# 基本的に開発者側の（コードの）問題
 #
 
-class NotInitializedError(JDIErrorData):
+# 開発者側に問題がある場合のエラー情報
+class DeveloperErrorData(JDIErrorData):
+    """開発者側に問題がある場合のエラー情報"""
+    def error_message(self) -> str:
+        return "コードに問題があります。"
+
+class NotInitializedError(DeveloperErrorData):
     """初期化されていない場合のエラー情報"""
     def error_message(self) -> str:
-        return "初期化されていません。ログを確認し、初期化処理の失敗原因を確認してください。"
+        msg = super().error_message()
+        return msg + "初期化されていません。ログを確認し、初期化処理の失敗原因を確認してください。"
 
-class ApiClientNotPrepared(JDIErrorData):
+class ApiClientNotPrepared(DeveloperErrorData):
     """APIクライアントが準備されていない場合のエラー情報"""
     def error_message(self) -> str:
-        return "APIクライアントが準備されていません。APIのトークンが正しく設定されているかなどを確認してください。"
+        msg = super().error_message()
+        if self.args:
+            return msg + "APIクライアントが準備されていません。" \
+                   f"エラー: {self.args}"
+        return msg + "APIクライアントが準備されていません。APIのトークンが正しく設定されているかなどを確認してください。"
+
+class DatabaseConnectionNotPrepared(DeveloperErrorData):
+    """データベース接続が準備されていない場合のエラー情報"""
+    def error_message(self) -> str:
+        msg = super().error_message()
+        if self.args:
+            return msg + "データベース接続が準備されていません。" \
+                   f"エラー: {self.args}"
+        return msg + "データベース接続が準備されていません。データベースのパスが正しく設定されているかなどを確認してください。"
+
+class DatabaseNotPrepared(DeveloperErrorData):
+    """データベースが準備されていない場合のエラー情報"""
+    def error_message(self) -> str:
+        msg = super().error_message()
+        if self.args:
+            return msg + "データベースが準備されていません。" \
+                   f"エラー: {self.args}"
+        return msg + "データベースが準備されていません。データベースのパスが正しく設定されているかなどを確認してください。"
 
 
 #
@@ -433,6 +486,8 @@ class ApiClientNotPrepared(JDIErrorData):
 #
 
 _class_registry: Dict[str, type[JDIErrorData]] = {
+    "UnexpectedError": UnexpectedError,
+    "TokenNotFoundError": TokenNotFoundError,
     "TokenMissingEnvEmpty": TokenMissingEnvEmpty,
     "TokenMissingEnvNotFound": TokenMissingEnvNotFound,
     "TokenInvalid": TokenInvalid,
@@ -444,8 +499,11 @@ _class_registry: Dict[str, type[JDIErrorData]] = {
     "ApiCommonIdSyncFailedError": ApiCommonIdSyncFailedError,
     "ApiDataNotFoundError": ApiDataNotFoundError,
     "ApiUnexpectedError": ApiUnexpectedError,
+    # 開発者エラー
     "NotInitializedError": NotInitializedError,
-    "UnexpectedError": UnexpectedError
+    "ApiClientNotPrepared": ApiClientNotPrepared,
+    "DatabaseConnectionNotPrepared": DatabaseConnectionNotPrepared,
+    "DatabaseNotPrepared": DatabaseNotPrepared,
 }
 """エラークラスの登録 (JSONとの変換用)"""
 
