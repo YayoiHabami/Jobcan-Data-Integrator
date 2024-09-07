@@ -325,8 +325,11 @@ class JobcanApiGateway:
             issue_callback: Optional[Callable[[Union[ie.JDIErrorData,
                                                      iw.JDIWarningData]], None]]=None,
             progress_callback: Optional[Callable[[APIType, int, Optional[int], int, int],
-                                                 None]]=None
-        ) -> Tuple[Optional[ie.JDIErrorData], list[str], Dict[int, FormOutline]]:
+                                                 None]]=None,
+            id_progress_callback: Optional[Callable[[Literal["fetch-failure", "success"],
+                                                     int, Optional[FormOutline], Optional[str]],
+                                                    None]]=None
+        ) -> Optional[ie.JDIErrorData]:
         """申請書(概要)の取得＆更新
 
         Parameters
@@ -342,16 +345,16 @@ class JobcanApiGateway:
             進捗状況を報告するコールバック関数、currentは現在の進捗、totalは総数(未知の場合はNone)、
             sub_countは処理中のform_idが何番目か、sub_totalは処理するform_idの総数
             `func(api_type, current, total, sub_count, sub_total) -> None`
+        id_progress_callback : func(str, int, Optional[FormOutline], Optional[str]) -> None
+            進捗状況を報告するコールバック関数、`func(str, form_id, form_outline, last_access) -> None`
+            であり、第一引数 str は以下のように呼び出される
+              - APIからの取得に失敗した場合は`"fetch-failure"`として、
+              - 特定のform_idの処理が成功した場合は`"success"`として
 
         Returns
         -------
         Optional[ie.JDIErrorData]
             エラーが発生した場合はエラー情報、それ以外はNone
-        list[str]
-            申請書(概要)データの取得に失敗したものが存在するform_idのリスト
-            (ある種類の申請書について、対象となる全request_idを取得できた場合、そのform_idは含まれない)
-        Dict[int, FormOutline]
-            取得したデータのリスト
 
         Notes
         -----
@@ -369,16 +372,20 @@ class JobcanApiGateway:
         """
         ignore = set() if ignore is None else ignore
         applied_after = {} if applied_after is None else applied_after
-        f_ids = [] # 取得に失敗したデータのform_idのリスト
-        forms: Dict[int, FormOutline] = dict() # 取得したデータのリスト
+
+        if not id_progress_callback:
+            # id_progress_callbackが指定されていない場合は、ダミー関数を設定
+            id_progress_callback = lambda a, b, c, d: None
 
         if not self.is_prepared:
-            return self.not_prepared_error(), f_ids, forms
+            return self.not_prepared_error()
 
         # 対象となるform_idを取得 (ignoreで指定されたform_idはこの時点で除外)
         ids = [id for id in f_io.retrieve_form_ids(self._conn) if str(id) not in ignore]
         if progress_callback:
             progress_callback(APIType.FORM_V1, 0, None, 0, len(ids))
+        for f_id in ignore:
+            id_progress_callback("success", int(f_id), None, None)
 
         for i, form_id in enumerate(ids):
             def pgc(a:APIType, c:int, t:Optional[int], sc=i+1, st=len(ids)) -> None:
@@ -393,22 +400,14 @@ class JobcanApiGateway:
             )
             if isinstance(err, ie.JDIErrorData):
                 # エラーが発生した場合は処理を終了
-                return err, f_ids, forms
+                return err
             elif isinstance(err, iw.JDIWarningData):
                 # 取得できなかったrequest_idがある場合、form_idを記録して処理を続行
-                f_ids.append(form_id)
+                id_progress_callback("fetch-failure", form_id, f_outline, last_access)
 
-            # 取得したデータを記録
-            if form_id not in forms:
-                forms[form_id] = f_outline
-            else:
-                forms[form_id].add_ids(f_outline.ids)
+            id_progress_callback("success", form_id, f_outline, last_access)
 
-            if f_outline.success:
-                # 取得に成功した場合、最終アクセス日時を設定
-                forms[form_id].last_access = last_access
-
-        return None, f_ids, forms
+        return None
 
     def update_form_detail(
             self,
@@ -418,9 +417,11 @@ class JobcanApiGateway:
             issue_callback: Optional[Callable[[Union[ie.JDIErrorData,
                                                      iw.JDIWarningData]], None]]=None,
             progress_callback: Optional[Callable[[APIType, int, Optional[int], int, int],
-                                                 None]]=None
-        ) -> Tuple[Optional[ie.JDIErrorData],
-                   Dict[int, set[str]], Dict[int, set[str]], Dict[int, set[str]], list[int]]:
+                                                 None]]=None,
+            id_progress_callback: Optional[Callable[[Literal["fetch-failure", "save-failure",
+                                                             "success-req", "success-form"],
+                                                     int, Optional[str]], None]] = None
+        ) -> Optional[ie.JDIErrorData]:
         """申請書の詳細データの取得＆更新
 
         Parameters
@@ -436,22 +437,18 @@ class JobcanApiGateway:
             進捗状況を報告するコールバック関数、currentは現在の進捗、totalは総数(未知の場合はNone)、
             sub_countは処理中のform_idが何番目か、sub_totalは処理するform_idの総数
             `func(api_type, current, total, sub_count, sub_total) -> None`
+        id_progress_callback : func(str, int, int) -> None, optional
+            進捗状況を報告するコールバック関数、`func(str, form_id, request_id) -> None`
+            であり、第一引数 str は以下のように呼び出される
+              - APIからの取得に失敗した場合は`"fetch-failure"`として、
+              - 保存に失敗した場合は`"save-failure"`として、
+              - 特定のrequest_idの処理が成功した場合は`"success-req"`として (ignoreも含む)、
+              - form_idの全てのrequest_idの処理が終了した場合は`"success-form"`(request_id=None)
 
         Returns
         -------
         Optional[ie.JDIErrorData]
             エラーが発生した場合はエラー情報、それ以外はNone
-        Dict[int, set[str]]
-            取得に失敗したデータのrequest_id、キーはform_id
-        Dict[int, set[str]]
-            保存に失敗したデータのrequest_id、キーはform_id
-        Dict[int, set[str]]
-            処理に成功したデータのrequest_id、キーはform_id
-            あるrequest_idの処理中に警告が発生した場合でも、保存まで完了したものはここに含まれる
-        list[int]
-            処理が正常に完了した申請書のform_id
-            一つ目の戻り値がNoneであればすべてのform_idが含まれるが、エラーが発生した場合は発生した
-            直前のform_idまでが含まれる
 
         Notes
         -----
@@ -463,17 +460,13 @@ class JobcanApiGateway:
             ignoreによる除外の総数が 100 件だった場合、`total` は 467 となる。
           - `current` は現在の進捗を示す。request_id="sa-10"の申請書が300件目である場合、`current` は 300 となる。
         """
-        # 取得に失敗したデータのrequest_id、キーはform_id
-        r_ids_f: Dict[int, set[str]] = {f_id: set() for f_id in forms.keys()}
-        # 保存に失敗したデータのrequest_id、キーはform_id
-        r_ids_d: Dict[int, set[str]] = {f_id: set() for f_id in forms.keys()}
-        # 処理に成功したデータのrequest_id、キーはform_id
-        r_ids_s: Dict[int, set[str]] = {f_id: set() for f_id in forms.keys()}
-        # 処理が正常に完了した申請書のform_id
-        suc_f_ids: list[int] = []
+
+        if not id_progress_callback:
+            # id_progress_callbackが指定されていない場合は、ダミー関数を設定
+            id_progress_callback = lambda a, b, c: None
 
         if not self.is_prepared:
-            return self.not_prepared_error(), r_ids_f, r_ids_d, r_ids_s, suc_f_ids
+            return self.not_prepared_error()
 
         if progress_callback:
             progress_callback(APIType.REQUEST_DETAIL, 0, None, 0, len(forms))
@@ -486,30 +479,37 @@ class JobcanApiGateway:
                         r_io.RequestStatus.CANCELED, r_io.RequestStatus.CANCELED_AFTER_COMPLETION}
             target_ids.update(r_io.retrieve_ids(self._conn.cursor(), form_id, ant_status=ant_stat))
             if ignore: # 除外指定がある場合は除外
-                target_ids -= set(ignore)
+                # 除外するものについてid_progress_callbackを呼び出す
+                for r_id in ignore & target_ids:
+                    id_progress_callback("success-req", form_id, r_id)
+                # 除外
+                target_ids -= ignore
 
             for j, request_id in enumerate(target_ids):
                 # APIにより申請書データを取得
                 res = self._client.fetch_form_detail(request_id, issue_callback=issue_callback)
                 if isinstance(res.error, ie.JDIErrorData):
-                    return res.error, r_ids_f, r_ids_d, r_ids_s, suc_f_ids
+                    return res.error
                 elif isinstance(res.error, iw.JDIWarningData):
-                    r_ids_f[form_id].add(request_id)
+                    # 取得に失敗した場合はid_progress_callbackを呼び出す
+                    id_progress_callback("fetch-failure", form_id, request_id)
                     continue
 
                 # 取得したデータをDBに反映
                 err = self._update_data(r_io.update, res.results[0], APIType.REQUEST_DETAIL,
                                         issue_callback=issue_callback)
                 if isinstance(err, ie.JDIErrorData):
-                    return err, r_ids_f, r_ids_d, r_ids_s, suc_f_ids
+                    return err
                 elif isinstance(err, iw.JDIWarningData):
-                    r_ids_d[form_id].add(request_id)
+                    # 保存に失敗した場合はid_progress_callbackを呼び出す
+                    id_progress_callback("save-failure", form_id, request_id)
 
                 # 処理が完了したデータのrequest_idを記録
                 if progress_callback:
                     progress_callback(APIType.REQUEST_DETAIL, j+1, len(target_ids), i+1, len(forms))
-                r_ids_s[form_id].add(request_id)
-            # 処理が正常に完了した申請書のform_idを記録
-            suc_f_ids.append(form_id)
+                id_progress_callback("success-req", form_id, request_id)
 
-        return None, r_ids_f, r_ids_d, r_ids_s, suc_f_ids
+            # 処理が正常に完了した申請書のform_idを記録
+            id_progress_callback("success-form", form_id, None)
+
+        return None

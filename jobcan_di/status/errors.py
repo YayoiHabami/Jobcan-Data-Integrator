@@ -67,7 +67,6 @@ class JDIErrorData(metaclass=ABCMeta):
         elif isinstance(e, dict):
             e_name = e.get("exception_name", "UnexpectedError")
             e_args = e.get("args", "")
-            self._details = e
 
         self._details["e"] = {
             "exception_name": e_name,
@@ -133,6 +132,20 @@ class JDIErrorData(metaclass=ABCMeta):
 
 class UnexpectedError(JDIErrorData):
     """未知のエラーが発生した場合のエラー情報"""
+    def __init__(self, e: Union[Exception, str, dict, None]=None,
+                 tr: str="") -> None:
+        """未知のエラーが発生した場合のエラー情報
+
+        Parameters
+        ----------
+        e : Exception | str | dict | None
+            例外、またはエラーメッセージ
+            dict の場合はエラー詳細を格納した辞書
+        tr : str
+            追加のトレースバック情報
+        """
+        super().__init__(e)
+        self._details["tr"] = tr
 
     def error_message(self) -> str:
         if self.exception_name is None:

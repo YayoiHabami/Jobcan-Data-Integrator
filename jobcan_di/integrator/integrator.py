@@ -48,7 +48,7 @@ import sqlite3
 import traceback
 from typing import Union, Optional, Tuple, Literal, Callable
 
-from jobcan_di.gateway import JobcanApiClient, JobcanApiGateway
+from jobcan_di.gateway import JobcanApiClient, JobcanApiGateway, FormOutline
 from jobcan_di.status import AppProgress
 from jobcan_di.status import errors as ie
 from jobcan_di.status import progress as ps
@@ -707,30 +707,72 @@ class JobcanDataIntegrator:
         # 前回の進捗状況が申請書データ (概要) の取得である場合、取得に成功したデータを除外
         # ただし除外対象から前回取得に失敗したデータは除外 (再取得を試みる)
         ignore = set()
-        if (self.config.app_status.progress.get()[1]
+        if (self._previous_progress.get()[1]
                 == ps.get_detailed_progress_status(APIType.REQUEST_OUTLINE)):
             ignore = {str(i) for i in self._previous_progress.specifics}
         ignore -= self.config.app_status.fetch_failure_record.get(APIType.REQUEST_OUTLINE)
+
         # 申請書データ (概要) 取得
-        err, r_uid, forms = self._gateway.get_form_outline(
+        forms: dict[int, FormOutline] = dict()
+        err = self._gateway.get_form_outline(
             applied_after=self.config.app_status.form_api_last_access,
             ignore=ignore, issue_callback=self._update_issue,
             progress_callback=lambda a, c, t, sc, st: self._update_progress(
                 ps.get_progress_status(a), ps.get_detailed_progress_status(a), c, t, sc, st
+            ),
+            id_progress_callback=lambda s, fid, la, fs=forms: self._fid_progress_callback(
+                s, fid, la, fs
             )
         )
-        if r_uid:
-            # 取得に失敗したデータのform_idをapp_statusに記録
-            self.config.app_status.fetch_failure_record.add(APIType.REQUEST_OUTLINE,
-                                                            target = set(r_uid))
-
-        # 成功/失敗に関わらず、取得したデータを一時ファイルに保存
-        self._tmp_io.save_form_outline(forms)
-        # 進捗状況を更新 (取得済みのデータ & 除外対象を追加)
-        processed_ids = ignore | {str(k) for k in forms}
-        self.config.app_status.progress.add_specifics(processed_ids)
 
         return err
+
+    def _fid_progress_callback(self,
+                              stat:Literal["fetch-failure", "success"],
+                              form_id:int,
+                              f_outline:Optional[FormOutline]=None,
+                              last_access:Optional[str]=None,
+                              forms:Optional[dict[int, FormOutline]]=None) -> None:
+        """申請書データ (概要) 取得の進捗状況を更新する
+
+        Parameters
+        ----------
+        stat : Literal["fetch-failure", "success"]
+            進捗状況
+        form_id : int
+            申請書ID
+        f_outline : Optional[FormOutline]
+            申請書データ (概要)
+        last_access : Optional[str]
+            最終アクセス日時
+        forms : Optional[dict[int, FormOutline]]
+            申請書データ (概要)、取得したデータを一時保存する場合に使用
+        """
+        if stat == "fetch-failure":
+            # APIからのデータ取得に失敗した場合はapp_statusへの記録のみ行う
+            self.config.app_status.fetch_failure_record.add(
+                APIType.REQUEST_OUTLINE, target=str(form_id)
+            )
+            return
+        elif stat == "success":
+            self.config.app_status.progress.add_specifics(form_id)
+
+        if forms is None or f_outline is None or last_access is None:
+            # forms, f_outline, last_accessが指定されていない (->"fetch-failure") 場合は
+            # 以下の処理を行わない
+            return
+
+        # 取得したデータを記録
+        if form_id not in forms:
+            forms[form_id] = f_outline
+        else:
+            forms[form_id].add_ids(f_outline.ids)
+        if f_outline.success:
+            # 取得に成功した場合、最終アクセス日時を更新
+            forms[form_id].last_access = last_access
+
+        # 一時ファイルに保存
+        self._tmp_io.save_form_outline(forms)
 
     def _update_form_detail(self) -> Optional[ie.JDIErrorData]:
         """申請書データ (詳細) の取得＆更新"""
@@ -739,41 +781,62 @@ class JobcanDataIntegrator:
             return
 
         forms = self._tmp_io.load_form_outline()
+
         ignore = set()
-        if (self.config.app_status.progress.get()[1]
+        if (self._previous_progress.get()[1]
                 == ps.get_detailed_progress_status(APIType.REQUEST_DETAIL)):
             ignore = {str(i) for i in self._previous_progress.specifics}
-        # TODO: ignoreから一部除外
-        err, fid, did, sid, suc_fid = self._gateway.update_form_detail(
+        print(f"{ignore=}")
+        # TODO: ignoreから一部除外 (前回取得に失敗したデータは再取得を試みる)
+
+        # 申請書データ (詳細) 取得
+        err = self._gateway.update_form_detail(
             forms, ignore=ignore, issue_callback=self._update_issue,
             progress_callback=lambda a, c, t, sc, st: self._update_progress(
                 ps.get_progress_status(a), ps.get_detailed_progress_status(a), c, t, sc, st
+            ),
+            id_progress_callback=lambda s, fid, rid, fs=forms: self._rid_progress_callback(
+                s, fid, rid, fs
             )
         )
-        for form_id, request_ids in fid.items():
-            # 取得に失敗したデータのrequest_idをapp_statusに記録
-            self.config.app_status.fetch_failure_record.add(APIType.REQUEST_DETAIL,
-                                                            form_id=form_id, target=request_ids)
-        for form_id, request_ids in did.items():
-            # 保存に失敗したデータのrequest_idをapp_statusに記録
-            self.config.app_status.db_save_failure_record.add(APIType.REQUEST_DETAIL,
-                                                              form_id=form_id, target=request_ids)
-
-        processed_ids = ignore
-        for form_id, request_ids in sid.items():
-            processed_ids.update(request_ids)
-            # 一時ファイルから取得に成功したrequest_idを削除
-            forms[form_id].remove_ids(request_ids)
-        # 進捗状況を更新 (取得済みのデータ & 除外対象を追加)
-        self.config.app_status.progress.add_specifics(processed_ids)
-        for form_id in forms:
-            # 一時ファイルからスキップしたrequest_idを削除
-            forms[form_id].remove_ids(ignore)
-        # 一時ファイルを更新
-        self._tmp_io.save_form_outline(forms)
-
-        # 最終アクセス日時を更新 (成功したもののみ)
-        for form_id in suc_fid:
-            forms[form_id].last_access = forms[form_id].last_access
 
         return err
+
+    def _rid_progress_callback(self,
+                               stat:Literal["fetch-failure", "save-failure",
+                                                "success-req", "success-form"],
+                               form_id:int,
+                               request_id:Optional[str]=None,
+                               forms:Optional[dict[int, FormOutline]]=None) -> None:
+        """申請書データ (詳細) 取得の進捗状況を更新する
+
+        Parameters
+        ----------
+        stat : Literal["fetch-failure", "save-failure", "success-req", "success-form"]
+            進捗状況
+        form_id : int
+            申請書ID
+        request_id : Optional[str]
+            申請ID
+        forms : Optional[dict[int, FormOutline]]
+            申請書データ (概要)、取得したデータを一時保存する場合に使用
+        """
+        if forms is None:
+            forms = dict()
+
+        if request_id is None:
+            if stat == "success-form" and form_id in forms:
+                self.config.app_status.form_api_last_access[form_id] = forms[form_id].last_access
+            return
+
+        if stat == "fetch-failure":
+            self.config.app_status.fetch_failure_record.add(
+                APIType.REQUEST_DETAIL, form_id=form_id, target={request_id})
+        elif stat == "save-failure":
+            self.config.app_status.db_save_failure_record.add(
+                APIType.REQUEST_DETAIL, form_id=form_id, target={request_id})
+        elif stat == "success-req":
+            self.config.app_status.progress.add_specifics(request_id)
+            # 一時ファイルを更新
+            forms[form_id].remove_id(request_id)
+            self._tmp_io.save_form_outline(forms)
