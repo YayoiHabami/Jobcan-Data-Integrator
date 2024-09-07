@@ -63,7 +63,7 @@ class JDIErrorData(metaclass=ABCMeta):
             e_args = e
         elif isinstance(e, Exception):
             e_name = e.__class__.__name__
-            e_args = e.args[0] if e.args else ""
+            e_args = str(e.args[0]) if e.args else ""
         elif isinstance(e, dict):
             e_name = e.get("exception_name", "UnexpectedError")
             e_args = e.get("args", "")

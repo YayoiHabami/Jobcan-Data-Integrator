@@ -45,6 +45,7 @@ with JobcanDataIntegrator(config) as di:
 """
 import os
 import sqlite3
+import traceback
 from typing import Union, Optional, Tuple, Literal, Callable
 
 from jobcan_di.gateway import JobcanApiClient, JobcanApiGateway
@@ -108,7 +109,8 @@ class JobcanDataIntegrator:
         if self.config.save_json:
             client = JobcanApiClient(self.config.requests_per_sec,
                                      base_url=self.config.base_url,
-                                     json_output_dir=self.config.json_dir)
+                                     output_dir=self.config.json_dir,
+                                     output_as_json=False)  # TODO: コンフィグでDB保存を選択可能にする
         else:
             client = None
         self._gateway = JobcanApiGateway(interval_seconds=self.config.requests_per_sec,
@@ -141,7 +143,7 @@ class JobcanDataIntegrator:
     def __enter__(self) -> "JobcanDataIntegrator":
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback) -> None:
+    def __exit__(self, exc_type, exc_value, traceback_) -> None:
         self.cleanup()
 
     #
@@ -499,6 +501,7 @@ class JobcanDataIntegrator:
         # TODO: 前回 (_previous_status) と今回 (app_status) の進捗状況の統合
         # 統合したものをapp_statusのprogressとして更新・保存する
         # 現在は_previous_progressなので不要
+        self.save_status()
 
         self._is_canceled = True
         self._completed = False
@@ -557,6 +560,9 @@ class JobcanDataIntegrator:
         try:
             self._run()
         except Exception as e:
+            tr = traceback.format_exc()
+            if self.config.logging_to_console:
+                print(tr)
             return self.cancel(ie.UnexpectedError(e))
 
     def restart(self) -> Optional[ie.JDIErrorData]:

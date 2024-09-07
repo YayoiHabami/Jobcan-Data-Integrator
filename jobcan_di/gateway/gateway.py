@@ -122,6 +122,8 @@ class JobcanApiGateway:
         if isinstance(self._conn, sqlite3.Connection):
             self._conn.close()
 
+        self._client.cleanup()
+
     def prepare(self, *,
                 token: str,
                 db_path: str) -> Optional[ie.JDIErrorData]:

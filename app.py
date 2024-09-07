@@ -29,6 +29,9 @@ def main() -> None:
                 until_dt = datetime.datetime.now() + datetime.timedelta(seconds=sleep_sec[0])
                 print(f"waiting {sleep_sec[0]} sec... (until {until_dt.strftime('%H:%M:%S')})")
                 time.sleep(sleep_sec.pop(0))
+            else:
+                # 上記以外のエラーの場合は終了
+                break
 
             err = di.restart()
 
