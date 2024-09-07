@@ -31,3 +31,8 @@ def main() -> None:
                 time.sleep(sleep_sec.pop(0))
 
             err = di.restart()
+
+
+
+if __name__ == "__main__":
+    main()

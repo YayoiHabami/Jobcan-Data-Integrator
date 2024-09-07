@@ -452,6 +452,7 @@ class JobcanApiClient:
         res = self._fetch_data(url, APIType.REQUEST_DETAIL, issue_callback=issue_callback)
 
         # JSON出力
-        self._save_as_json(APIType.REQUEST_DETAIL, res.results[0], request_id=request_id)
+        if res.success:
+            self._save_as_json(APIType.REQUEST_DETAIL, res.results[0], request_id=request_id)
 
         return res

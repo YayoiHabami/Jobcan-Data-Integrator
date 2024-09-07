@@ -46,7 +46,7 @@ class JDIWarningData(metaclass=ABCMeta):
             例外、エラーメッセージ、エラー情報
             dictの場合は、エラー情報を格納した辞書
         """
-        self.details: Dict[str, Optional[str]] = {}
+        self._details: dict = {}
 
         if isinstance(e, str):
             e_name = "UnexpectedError"
