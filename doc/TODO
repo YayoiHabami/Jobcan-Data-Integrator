@@ -1,0 +1,172 @@
+全体:
+    ☐ `/v1/projects/`API関連の実装
+        ☐ プログラムの作成
+        ☐ `データベース構造.md`の更新
+    ☐ `/v1/company/`API関連の実装
+        ☐ プログラムの作成
+        ☐ `データベース構造.md`の更新
+    ☐ Inno Setupによるインストーラの作成
+    ☐ 文字列を`'`から`"`に統一する
+    ☐ **コンフィグのCATCH_ERRORS_ON_RUNをFalseにする**
+    ☐ jobcan_diのバージョンを定義する
+        ☐ `pyproject.toml`を追加
+        ☐ `jobcan_di/__init__.py`の`__version__`に、`_version.py`からの読み込みを追加
+        ☐ トーストのタイトルにバージョンを表示する
+
+DB構造(いずれも変更時は`データベース構造.md`を編集のこと):
+    ☐ `users`テーブルの主キーを`user_code`に変更する
+    ☐ `requests`の各大テーブルの項目の説明を追加する
+        ☐ `customized_items`
+        ☐ `expense`
+        ☐ `payment`
+        ☐ `ec`
+        ☐ `approval_process`
+        ☐ `viewers`
+    ☐ ビューの作成
+
+ドキュメント:
+    ☐ アプリの使用方法（起動、通知の確認、DBの場所など）をREADMEに追加
+        ☐ →「ジョブカン側のアクセス制限」により、データの更新（特に初回）には時間がかかることを、**目立つように**書く
+    ☐ アプリで使用するファイルについて説明（DB、開発者向けにconfigとapp_status）
+    ☐ コンフィグの使用方法を同上
+    ✔ 今回のアプリケーションの全体図を示せるとよい。「ローカル環境」、「SQLデータベース」、「本アプリケーション」、「コンフィグ」、「ODBC (SQLite driver / Data Source)」、「Power BI」 @done(24-09-08 17:36)
+    ☐ `JDIWarningData`に対応した説明と解決策を`警告・エラー.md`に追加
+    ☐ `JDIErrorData`に対応した説明と解決策を`警告・エラー.md`に追加
+    ☐ **取消された申請書の詳細は取得できないことを明記する** (APIの仕様)
+
+integrator:
+    ☐ `config.ini`が削除されても復帰可能なように、データを保持するソースとかを追加する
+    ✔ `.update_progress`と`.logger`を統合して隠蔽する @done(24-08-16 21:21)
+    ✔ `_update_basic_data`などを分割、`._run`内で呼び出す @done(24-08-22 10:29)
+    ✔ キャンセル時にapp_statusを保存するべきか検証する @done(24-09-08 17:32)
+    ログ・通知:
+        ☐ `ToastProgressNotifier`の`.notify`で前回の通知を記録し、直前の通知と同じ内容の場合は通知しないようにする
+        ☐ `Logger`の`.log`で前回のログを記録し、直前のログと同じ内容の場合はログしないようにする
+    非同期処理:
+        ☐ `JobcanDataIntegrator` の `._initialize` の各処理を非同期処理に変更する
+        ☐ `JobcanDataIntegrator` の `._run` の各処理を非同期処理に変更する
+        ☐ トースト通知に cancel ボタンを追加する
+        ☐ トースト通知に stop/restart ボタンを追加する
+    リソースの追加:
+        ✔ `JobcanDIConfig`のコンストラクタ引数に`resource_dir`を追加、指定されない場合は`app_dir`を使うようにする @done(24-08-18 12:19)
+        ✔ 通知時の基本3アイコンを`resources/icons/toast`に追加 @done(24-08-18 12:03)
+        ✔ アプリケーションののアイコンを`resources/icons/app`に追加 @done(24-08-18 12:03)
+        ✔ トースト通知にアイコンを表示させる @done(24-09-08 17:32)
+        ☐ `nuitka`によるビルドにアイコンを追加
+        ☐ `JobcanDIConfig`の`.app_icon_png_path`を`.toast_icon_path`に変更
+        ☐ `JobcanDIConfig`に`.app_icon_path`を追加
+    app_statusの追加:
+        ✔ app_statusを追加する @done(24-08-18 13:56)
+        ✔ app_statusで読込先config.iniが指定された場合はそちらを優先して読み込むようにする @done(24-08-18 14:36)
+        ✔ "last_access"を追加し、最終アクセス日時を記録する @done(24-08-18 16:38)
+        ✔ `AppProgress`の`status_detail`を`Optional`型に変更する @done(24-08-18 20:17)
+        ✔ app_status 読み込み時に "status_detail" が `TerminatingStatus.COMPLETED` である場合、`JobcanDIStatus.progress`を初期化前の状態に戻す @done(24-08-18 20:48)
+        ✔ `AppProgress`に細かい進捗状況 (intかstrのリスト、終了したものを格納する) を追加する @done(24-08-19 10:53)
+        ✔ `JobcanDIStatus.load`からデータの読み込み部分を分離 @done(24-09-08 17:34)
+    データ取得:
+        ☐ 更新中にcountが増えた場合の処理
+        ☐ `null`になりえる全データについて、それがなくなった場合の処理
+        ✔ 差分更新の実装 @done(24-09-08 17:34)
+        ✔ 申請書データ(概要)の取得に際して、`form_id`の時期条件を設定可能にする @done(24-08-18 16:53)
+        ✔ `JobcanDataIntegrator`から`._fetch_xxx`と`._update_xxx`を分離する @done(24-09-08 17:34)
+        ☐ データ取得時の並び順変更（重複が生じないように古いものから取得したい）
+        ☐ `v1/company`を取得・保存するコードを実装
+        ☐ `v1/fix_journal`を取得・保存するコードを実装
+    データ管理:
+        ☐ データが減少した場合の処理
+    進捗管理:
+        ☐ `app_status`の進捗に応じて、開始位置を変更する
+            ✔ `InitializingStatus`の場合は冒頭から開始する @done(24-08-18 21:03)
+            ✔ それ以外の場合、指定されたステータスから再度開始する @done(24-08-18 22:29)
+            ✔ `AppProgress`の細かい進捗状況に応じて、FormOutlineの開始位置を変更する @done(24-08-19 18:22)
+            ✔ `AppProgress`の細かい進捗状況に応じて、FormDetailの開始位置を変更する @done(24-09-08 17:34)
+            ✔ `FetchFailureRecord`の`._basic_data`等の値を`set[str]`に変更する @done(24-08-20 11:04)
+            ✔ 読み込み時に`FetchFailureRecord`が空でないAPIについて、再度処理を行うなどの処理を追加する @done(24-09-08 17:34)
+                ☐ basic_dataについて処理を追加する
+                ☐ `JobcanDataIntegrator._is_future_progress`に条件分岐を追加する
+        ✔ `app_status`を管理するメンバを2つに統合する @done(24-08-23 08:31)
+            ✔ `ProgressStatus`から`FAILED`を削除する @done(24-08-22 12:44)
+            ✔ `ErrorStatus`を削除する @done(24-08-22 13:19)
+            ✔ `JDIWarning`を削除する @done(24-08-22 16:32)
+            ✔ `JDIErrorData`クラスから`.status`メンバを削除、`._update_progress`もそれに対応させる @done(24-08-22 16:32)
+            ✔ `JDIErrorData`クラスに`._details:Dict[str,str]`を追加、全メンバ変数を置き換える。 @done(24-08-22 14:15)
+            ✔ `JDIErrorData`のコンストラクタに`e`を受け取らせ、`._exception_name`, `._args`プロパティを追加する @done(24-08-22 14:14)
+            ✔ app_statusに`current_error`を追加し、`JobcanDIStatus`に`has_error`プロパティ (`is not None`) を追加する @done(24-08-22 15:03)
+            ✔ `JobcanDataIntegrator`の`current_progress`プロパティを削除し、`has_error`プロパティを追加する @done(24-08-22 16:33)
+        例外処理:
+            ✔ (以降の処理を行わない)致命的なエラーが発生した場合に、`._is_canceled`を`True`にする @done(24-08-18 15:27)
+            ✔ 各処理の冒頭に、`._is_canceled`が`True`になっていないかの判定を追加する @done(24-08-18 15:27)
+            ☐ ディレクトリ作成時に、指定されたディレクトリへのアクセス権がない場合の処理を追加
+            ✔ トークン認証失敗時に、`sys.exit`を投げないようにする (`._init_token`) @done(24-08-18 15:27)
+            ✔ 同上 (`.update_token) ⇒ `bool`を返すようにし、それを受け取った側で処理を行う @done(24-08-18 15:31)
+            ✔ DB接続失敗時に、`sys.exit`を投げないようにする (`._init_connection`) @done(24-08-18 15:28)
+            ✔ `ThrottledRequest`で`requests.exceptions.ReadTimeout`が発生した場合の処理を追加する（キャッチ） @done(24-08-22 10:31)
+            ✔ 接続エラー`requests.exceptions.ConnectionError`が発生した場合の処理を追加する @done(24-08-22 10:31)
+                ✔ `JobcanDataIntegrator._fetch_xxx`の戻り値を`"success"`からJDIErrorインスタンスorNoneに変更 @done(24-08-20 23:30)
+                ✔ `._update_data`のエラー時`self._update_progress`を削除し、`JDIErrorData`を返すようにする @done(24-08-21 10:35)
+                    ✔ 失敗したデータを保存する`FailureRecord`を追加する @done(24-08-21 19:51)
+                    ✔ app_statusにDB関連エラー`DBSaveFailureRecord`を追加する @done(24-08-21 19:51)
+                    ✔ 値を取得するすべての場所に`.cancel`を追加する @done(24-08-22 10:30)
+                ✔ `._update_progress`は、`.cancel`内を除きエラーを受け取らないようにする @done(24-08-22 10:12)
+                ✔ エラーの場合、前回と今回の進捗を合成する @done(24-08-24 12:55)
+                    ✔ progress, current_error、config_file_pathは現在のものを採用 @done(24-08-24 12:55)
+                    ✔ failure_recordは、終了済みのものについては現在のものを、そうでないものは現在と今回の和集合を取る @done(24-08-24 12:55)
+                    ✔ form_api_last_accessは新しい方を採用 @done(24-08-24 12:55)
+                ✔ エラーの場合、`.cancel`してreturnする @done(24-08-22 21:09)
+                ☐ `._previous_progress`を`._previous_status`に変更する; 前回の失敗状況や最終読み込み日時が_previousに行くことで、app_statusには今回失敗した内容しか保持されずわかりやすくなる
+                    ☐ app_status初期読み込み時にfailure_recordを初期化する (影響範囲大)
+                    ☐ app_statusの各メンバを使用している箇所を変更する (影響範囲大)
+                    ☐ `.cancel`時に前回と今回をどう扱うかを検討する; `.cancel`に限らず`.run`終了時には_previousにマージされたものが格納され、`.restart`または`.cleanup`時にapp_statusが一部取り込み、アプリ終了時の最終保存時にマージしたものを保存 (起動中は_previousよりも保存されたapp_statusの方が短い可能性が高い)
+                    ☐ `JobcanDIStatus`をpreviousとしてコピーする関数`copy_as_previous`を`integrator_status.py`に追加
+                    ☐ `._run`の冒頭で未初期化の場合のエラーを_previousのcurrent_errorから取得・設定する
+                ✔ `.restart`メソッドを追加する @done(24-08-24 15:16)
+                ✔ `app.py`側で接続エラーの場合の処理を追加する @done(24-08-23 08:32)
+                    ☐ 外側から`JobcanDataIntegrator`の進捗を操作するメソッドを追加する（`._update_progress`を呼び出し、再開時刻を表示する）
+            ✔ `._update_progress`の第二引数を`DetailedProgressStatus`のみとする @done(24-08-22 20:38)
+                ✔ `JDIErrorData`と`JDIWarningData`を分離し、`_update_isssues`を追加する @done(24-08-22 20:38)
+            ✔ `UnknownError`に、エラーの詳細(traceback)を保存する @done(24-09-08 17:35)
+                ☐ そのほか詳細が欲しいエラーについても同様 (APIレスポンス保存時KeyErrorとかSQLエラー)
+            ✔ `._update_data`でKeyError等JSON変換エラーをキャッチする (warning) @done(24-09-08 17:35)
+            ☐ テーブルを正常に作成できているかの確認を追加 (`._init_tables`)
+            ☐ 最終的にエラーメッセージと対処法へのリンクを張る。対処法はdocにmarkdownで記述する。クラッシュした際などに、その実行で発生したエラー等と解決策をまとめたcrash-report.htmlを出力したい。
+            ✔ `.cancel`の責を`._run`に移す @done(24-08-22 21:09)
+            ✔ `._initialize`にも`try-except`を追加する @done(24-08-24 15:03)
+            ☐ `.cancel`を複数回実行しても状態が変化しないことを確認する
+        完了時処理:
+            ✔ `JobcanDataIntegrator.update_progress`について、`ProgressStatus.TERMINATING`である場合の処理を追加 (他の値の`None`を許容) @done(24-08-16 16:05)
+        BASIC_DATA:
+            ✔ users取得に失敗した場合、その旨をapp_statusに記録する @done(24-08-22 10:27)
+            ✔ usersの保存に失敗した場合、失敗した要素の`user_code`などを併せてapp_statusに記録する @done(24-08-22 10:27)
+            ✔ groupsの取得に失敗した場合、その旨をapp_statusに記録する @done(24-08-22 10:27)
+            ✔ groupsの保存に失敗した場合、失敗した要素の`group_code`などを併せてapp_statusに記録する @done(24-08-22 10:27)
+            ✔ positionsの取得に失敗した場合、その旨をapp_statusに記録する @done(24-08-22 10:27)
+            ✔ positionsの保存に失敗した場合、失敗した要素の`position_code`などを併せてapp_statusに記録する @done(24-08-22 10:27)
+        FORM_OUTLINE:
+            ✔ form取得に失敗した場合、その旨をapp_statusに記録する (→`.app_status.fetch_failure_record`) @done(24-08-20 15:28)
+            ✔ formの保存に失敗した場合、失敗した要素の`form_id`などを併せてapp_statusに記録する @done(24-08-22 10:26)
+            ✔ 各formの更新要素の取得に失敗した場合、その旨をapp_statusに記録する @done(24-08-20 15:30)
+                ✔ 一つでも取得ミスがあればその取得は失敗となるよう`._fetch_form_outline_data`を変更する @done(24-08-20 15:20)
+                ✔ 取得に失敗した場合、一時ファイルへの保存時に"success"はFalseとし、"lastAccess"を更新しないようにする @done(24-08-20 15:25)
+            ✔ `&completed_after=lastAccess&status=canceled_after_completion`である要素を取得するようにする @done(24-08-24 23:26)
+            ✔ `._update_form_outline`の`._update_progress`をまとめる @done(24-09-08 17:35)
+            ✔ `._update_form_outline`の`.config.app_status.progress.add_specifics`をまとめる @done(24-09-08 17:35)
+            ☐ 申請書(概要)取得時に、データを`requests`テーブルに保存する
+                ☐ statusがcanceledのものは詳細が存在しないが、その場合分けはしなくてよいか確認
+        FORM_DETAIL:
+            ☐ REQUEST_DETAIL_API_IGNORE_CANCELED コンフィグを追加
+                ☐ 現状APIでcanceledの要素は取得できないため、時短のためそれを除外
+            ✔ 一時ファイルへの保存 @done(24-08-20 22:03)
+                ✔ 申請書データの取得の成功ごとに一時ファイルからrequest_idを削除する @done(24-08-20 22:02)
+                ✔ すべてのrequest_idがなくなった場合にのみ、一時ファイルを削除する @done(24-08-19 17:58)
+            ✔ 申請書のステータスが`canceled_after_completion`,`completed`,`in_progress`,`returned`,`rejected`の5つのみであるかを確認 -> `実行フロー.md` @done(24-08-20 16:22)
+            ✔ 読込対象として、一時ファイルのIDだけでなく`requests`テーブルの継続中のIDも取得する @done(24-08-20 22:03)
+            ✔ 各申請書の取得に失敗した場合、その旨をapp_statusに記録する @done(24-08-20 22:03)
+            ✔ 各申請書の保存に失敗した場合、失敗した要素の`request_id`などを併せてapp_statusに記録する @done(24-08-22 10:26)
+            ✔ `._update_form_detail`の最後まで進んだらapp_statusの最終更新日時を更新 @done(24-08-20 22:03)
+
+ConfigEditorGUI:
+    ☐ タイトル・トップページの作成
+    ☐ 一度作成したWidgetをdestroyせず、`.remove`などしてリストに格納するなど
+    ☐ `ConfigVariableFrame`のフォントを日本語に対応させる⇒`ConfigEditorGuiFonts`クラスを作成
+    ☐ コンフィグを新たに開く`open`ボタンなどの実装
+    ☐ `ENABLE_PROGRESS_TOAST`コンフィグの追加 (本体にGUIを追加した場合は内部的にFalseにする)

@@ -1,5 +1,5 @@
 # Python env
-venv/
+jb39/
 __pycache__/
 
 # Experiments
@@ -10,3 +10,14 @@ experiments/
 *.log
 *.csv
 *.json
+app_status
+
+# Build (nuitka)
+*.build/
+*.dist/
+
+# Resources
+*.pptx
+
+# Config Editor GUI
+editor-status
