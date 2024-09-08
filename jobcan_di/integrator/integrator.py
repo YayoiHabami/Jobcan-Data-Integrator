@@ -786,7 +786,6 @@ class JobcanDataIntegrator:
         if (self._previous_progress.get()[1]
                 == ps.get_detailed_progress_status(APIType.REQUEST_DETAIL)):
             ignore = {str(i) for i in self._previous_progress.specifics}
-        print(f"{ignore=}")
         # TODO: ignoreから一部除外 (前回取得に失敗したデータは再取得を試みる)
 
         # 申請書データ (詳細) 取得

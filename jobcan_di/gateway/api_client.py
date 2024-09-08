@@ -421,9 +421,13 @@ class JobcanApiClient:
                 j_res = res.json()
             except json.JSONDecodeError:
                 # JSONデコードエラー
-                return ApiResponse(error=iw.ApiResponseJsonDecodeError(
+                warning = iw.ApiResponseJsonDecodeError(
                     api_type, res.status_code, res.text, url
-                ))
+                )
+                if issue_callback is not None:
+                    # 警告を発行
+                    issue_callback(warning)
+                return ApiResponse(error=warning)
 
             if res.status_code != 200:
                 # 正常なレスポンスが返ってこなかった場合

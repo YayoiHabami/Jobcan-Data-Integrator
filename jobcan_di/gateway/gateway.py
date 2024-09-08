@@ -460,13 +460,12 @@ class JobcanApiGateway:
             ignoreによる除外の総数が 100 件だった場合、`total` は 467 となる。
           - `current` は現在の進捗を示す。request_id="sa-10"の申請書が300件目である場合、`current` は 300 となる。
         """
+        if not self.is_prepared:
+            return self.not_prepared_error()
 
         if not id_progress_callback:
             # id_progress_callbackが指定されていない場合は、ダミー関数を設定
             id_progress_callback = lambda a, b, c: None
-
-        if not self.is_prepared:
-            return self.not_prepared_error()
 
         if progress_callback:
             progress_callback(APIType.REQUEST_DETAIL, 0, None, 0, len(forms))
@@ -485,6 +484,10 @@ class JobcanApiGateway:
                 # 除外
                 target_ids -= ignore
 
+            # 開始前の進捗状況を報告
+            if progress_callback:
+                progress_callback(APIType.REQUEST_DETAIL, 0, len(target_ids), i+1, len(forms))
+
             for j, request_id in enumerate(target_ids):
                 # APIにより申請書データを取得
                 res = self._client.fetch_form_detail(request_id, issue_callback=issue_callback)
@@ -493,21 +496,22 @@ class JobcanApiGateway:
                 elif isinstance(res.error, iw.JDIWarningData):
                     # 取得に失敗した場合はid_progress_callbackを呼び出す
                     id_progress_callback("fetch-failure", form_id, request_id)
-                    continue
+                else:
+                    # 取得したデータをDBに反映 (取得に成功した場合のみ保存を試みる)
+                    err = self._update_data(r_io.update, res.results[0], APIType.REQUEST_DETAIL,
+                                            issue_callback=issue_callback)
+                    if isinstance(err, ie.JDIErrorData):
+                        return err
+                    elif isinstance(err, iw.JDIWarningData):
+                        # 保存に失敗した場合はid_progress_callbackを呼び出す
+                        id_progress_callback("save-failure", form_id, request_id)
 
-                # 取得したデータをDBに反映
-                err = self._update_data(r_io.update, res.results[0], APIType.REQUEST_DETAIL,
-                                        issue_callback=issue_callback)
-                if isinstance(err, ie.JDIErrorData):
-                    return err
-                elif isinstance(err, iw.JDIWarningData):
-                    # 保存に失敗した場合はid_progress_callbackを呼び出す
-                    id_progress_callback("save-failure", form_id, request_id)
+                    # 取得に成功し保存時にエラーが発生しなかった場合はid_progress_callbackを呼び出す
+                    id_progress_callback("success-req", form_id, request_id)
 
-                # 処理が完了したデータのrequest_idを記録
+                # 処理が完了したデータのrequest_idを記録 (成功/失敗に関わらず)
                 if progress_callback:
                     progress_callback(APIType.REQUEST_DETAIL, j+1, len(target_ids), i+1, len(forms))
-                id_progress_callback("success-req", form_id, request_id)
 
             # 処理が正常に完了した申請書のform_idを記録
             id_progress_callback("success-form", form_id, None)
