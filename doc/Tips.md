@@ -1,5 +1,7 @@
 # Tips
 
+> [全体の目次に戻る](../README.html)
+
 ## 目次
 
 - [目次](#目次)
@@ -16,6 +18,10 @@
     - [SQLite ODBC Driver のインストール (再)](#sqlite-odbc-driver-のインストール-再)
     - [ODBC Data Source の設定 (再)](#odbc-data-source-の設定-再)
     - [Excel での設定](#excel-での設定)
+- [データの説明](#データの説明)
+  - [仕訳情報（fix\_journalsテーブル）](#仕訳情報fix_journalsテーブル)
+    - [カラムの説明](#カラムの説明)
+    - [テーブルの読み方](#テーブルの読み方)
 
 ## 実行に際して
 
@@ -185,3 +191,60 @@ bit数については64bitのものを選択すればよいかと思います。
 以下のような画面が開かれれば成功です。
 
 <img src="img/tips/image-17.png" alt="alt text" width=75%>
+
+## データの説明
+
+### 仕訳情報（fix_journalsテーブル）
+
+（2024/10/06 更新）
+
+#### カラムの説明
+
+　ジョブカン経費精算/ワークフローAPI（β版）（以下、API）では、以下の仕訳情報をそれぞれ対応するエンドポイントから取得できます。
+
+- **確定済み未出力仕訳情報**：（確定済み未出力仕訳情報一覧 v1; `/v1/fix_journals/unprinted/`）
+
+　取得したデータは本アプリケーションのデータベースの`fix_journals`テーブルに格納されます。各カラムの説明は以下の通りです。
+
+| 分類 | カラム名 | 説明 |
+| :-: | --- | --- |
+| fix <br> journal <br> 固有 | journal_id | 仕訳ID |
+| ^ | journal_type | `"book"`: 計上, `"pay"`: 支払 |
+| ^ | journal_date | `"book"`の場合は計上日, `"pay"`の場合は支払(予定)日 |
+| ^ | req_date <br> journal_summary <br> view_id <br> specifics_row_number | 対応する申請書の申請日、概要、申請ID（request_id）など |
+| ^ | company_code <br> company_name | 支払先のコード、名前 |
+| ^ | user_code <br> user_name | 申請者のコード、名前 |
+| debit <br> (借方) | debit_account_title_code <br> debit_account_title_name | 借方：勘定科目 <br> 例）支払手数料 |
+| ^ | debit_account_sub_title_code <br> debit_account_sub_title_name | 借方：補助科目 |
+| ^ | debit_tax_category_code <br> debit_tax_category_name | 借方：税区分 <br> 例）課税仕入(10%)、対象外 |
+| ^ | debit_amount <br> debit_tax_amount <br> debit_amount_without_tax | 借方：金額、税額、税抜金額 |
+| ^ | debit_group_code <br> debit_group_name <br> debit_accounting_group_code | 借方：負担グループ <br> 例）管理部、全社 |
+| ^ | debit_project_code <br> debit_project_name | 借方：負担プロジェクト |
+| credit <br> (貸方) | 同上、credit_ で始まるカラム | 同上、貸方の情報 |
+
+#### テーブルの読み方
+
+　以下が申請ID`123456`に対応する仕訳情報であるとします（表A）。この場合、`fix_journals`には表Bのようなデータが格納されます。
+
+**表A**．申請ID`123456`に対応する仕訳情報（例）
+
+| | > | debit (借方) | > | credit (貸方) |
+| :---: | --- | :---: | --- | :---: |
+|   | 勘定科目 | 税抜金額 $+$ 税額 $=$ 金額 | 勘定科目 | 税抜金額 $+$ 税額 $=$ 金額 |
+| 4/30 4月分計上 <br> book (計上) | **支払手数料** | $45360 + 4535 = 49895$ |  **未払金** | $49895 + 0 = 49895$ |
+| ^ | **支払手数料** | $4641 + 464 = 5105$ |  **預り金** | $5105 + 0 = 5105$ |
+| 5/31 5月分支払 <br> pay (支払) | **未払金** | $49895 + 0 = 49895$ |  **普通預金** | $49895 + 0 = 49895$ |
+
+**表B**．`fix_journals`テーブルにおける、申請ID`123456`に対応する仕訳情報（例）．いくつかのカラムのみを抜粋
+
+| journal_type | journal_date | req_date | view_id | debit_account_title_name | debit_amount | debit_tax_amount | debit_amount_without_tax | credit_account_title_name | ... |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| book | 2024/04/30 | 2024/04/18 | 123456 | 支払手数料 | 49895 | 4535 | 45360 | 未払金 | ... |
+| book | 2024/04/30 | 2024/04/18 | 123456 | 支払手数料 | 5105 | 464 | 4641 | 預り金 | ... |
+| pay | 2024/05/31 | 2024/04/18 | 123456 | 未払金 | 49895 | 0 | 49895 | 普通預金 | ... |
+
+
+---
+
+> [全体の目次に戻る](../README.html)
+

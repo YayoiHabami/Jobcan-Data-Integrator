@@ -2,6 +2,8 @@
 
 　本項では、本アプリケーションが使用するデータベースのテーブルについて説明します。
 
+> [全体の目次に戻る](../README.html)
+
 ## 目次
 
 - [目次](#目次)
@@ -9,6 +11,9 @@
 - [ユーザー情報 (users)](#ユーザー情報-users)
 - [グループ (groups)](#グループ-groups)
 - [役職 (positions)](#役職-positions)
+- [プロジェクト (projects)](#プロジェクト-projects)
+- [取引先 (company)](#取引先-company)
+- [確定済み未出力仕訳 (fix\_journals)](#確定済み未出力仕訳-fix_journals)
 - [フォーム (forms)](#フォーム-forms)
 - [申請書 (requests)](#申請書-requests)
   - [メイン (requests)](#メイン-requests)
@@ -125,6 +130,116 @@ positions {
 ```
 
 **図** 役職テーブルのER図．`user_positions`は[ユーザー情報](#ユーザー情報-users)のテーブルとの関連を示しています
+
+## プロジェクト (projects)
+
+　ジョブカンに登録されているプロジェクト情報を格納するテーブルです。プロジェクト情報には、プロジェクトの基本情報が含まれます。
+
+```mermaid
+erDiagram
+    projects
+
+projects {
+    TEXT project_code PK
+    TEXT project_name
+}
+```
+
+**図** プロジェクトテーブルのER図．
+
+## 取引先 (company)
+
+　ジョブカンに登録されている取引先情報を格納するテーブルです。取引先情報には、取引先の基本情報が含まれます。
+
+　ここで、`bank_account_type_code`は`"1"`などの数字で表されていますが、確認できる範囲では以下のように対応しているようです。
+
+- `"1"`: 普通
+- `"2"`: 当座
+- `"9"`: その他
+
+```mermaid
+
+erDiagram
+    company
+
+company {
+    TEXT company_code PK
+    TEXT company_name
+    TEXT zip_code
+    TEXT address
+    TEXT bank_code
+    TEXT bank_name
+    TEXT branch_code
+    TEXT branch_name
+    TEXT bank_account_type_code
+    TEXT bank_account_code
+    TEXT bank_account_name_kana
+    TEXT invoice_registrated_number
+}
+```
+
+**図** 取引先テーブルのER図．
+
+## 確定済み未出力仕訳 (fix_journals)
+
+　ジョブカンに登録されている確定済み未出力仕訳情報を格納するテーブルです。APIによるデータ取得時点で未出力の仕訳情報が格納されますが、本ソフトウェアが当テーブルからデータを削除することはありません。このため、古いデータについては出力済みの可能性があります。
+
+```mermaid
+erDiagram
+    fix_journals ||--o{ custom_journal_items : ""
+
+fix_journals {
+    INTEGER journal_id PK
+    TEXT journal_type
+    TEXT journal_date
+    TEXT req_date
+    TEXT journal_summary
+    TEXT view_id
+    INTEGER specifics_row_number
+    TEXT company_code
+    TEXT company_name
+    TEXT user_code
+    TEXT user_name
+    TEXT debit_account_title_code
+    TEXT debit_account_title_name
+    TEXT debit_account_sub_title_code
+    TEXT debit_account_sub_title_name
+    TEXT debit_tax_category_code
+    TEXT debit_tax_category_name
+    INTEGER debit_amount
+    INTEGER debit_tax_amount
+    INTEGER debit_amount_without_tax
+    TEXT debit_group_code
+    TEXT debit_group_name
+    TEXT debit_accounting_group_code
+    TEXT debit_project_code
+    TEXT debit_project_name
+    TEXT credit_account_title_code
+    TEXT credit_account_title_name
+    TEXT credit_account_sub_title_code
+    TEXT credit_account_sub_title_name
+    TEXT credit_tax_category_code
+    TEXT credit_tax_category_name
+    INTEGER credit_amount
+    INTEGER credit_tax_amount
+    INTEGER credit_amount_without_tax
+    TEXT credit_group_code
+    TEXT credit_group_name
+    TEXT credit_accounting_group_code
+    TEXT credit_project_code
+    TEXT credit_project_name
+    TEXT invoice_registrated_number
+}
+
+custom_journal_items {
+    INTEGER journal_id FK
+    TEXT key
+    TEXT value
+    TEXT generic_master_record_code
+}
+```
+
+**図** 確定済み未出力仕訳テーブルのER図．
 
 ## フォーム (forms)
 
@@ -964,3 +1079,7 @@ file_associations {
     INTEGER default_attachment "request_id に何回 default_attachment として登録されるか"
 }
 ```
+
+---
+
+> [全体の目次に戻る](../README.html)

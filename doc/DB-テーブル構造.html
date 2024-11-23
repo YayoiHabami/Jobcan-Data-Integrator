@@ -1,0 +1,1079 @@
+<!DOCTYPE html><html><head>
+      <title>DB-テーブル構造</title>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      
+      <link rel="stylesheet" href="file:///c:\Users\nggen\.vscode\extensions\shd101wyy.markdown-preview-enhanced-0.8.15\crossnote\dependencies\katex\katex.min.css">
+      
+      
+      <script type="text/javascript" src="file:///c:\Users\nggen\.vscode\extensions\shd101wyy.markdown-preview-enhanced-0.8.15\crossnote\dependencies\mermaid\mermaid.min.js" charset="UTF-8"></script>
+      
+      
+      <style>
+      code[class*=language-],pre[class*=language-]{color:#333;background:0 0;font-family:Consolas,"Liberation Mono",Menlo,Courier,monospace;text-align:left;white-space:pre;word-spacing:normal;word-break:normal;word-wrap:normal;line-height:1.4;-moz-tab-size:8;-o-tab-size:8;tab-size:8;-webkit-hyphens:none;-moz-hyphens:none;-ms-hyphens:none;hyphens:none}pre[class*=language-]{padding:.8em;overflow:auto;border-radius:3px;background:#f5f5f5}:not(pre)>code[class*=language-]{padding:.1em;border-radius:.3em;white-space:normal;background:#f5f5f5}.token.blockquote,.token.comment{color:#969896}.token.cdata{color:#183691}.token.doctype,.token.macro.property,.token.punctuation,.token.variable{color:#333}.token.builtin,.token.important,.token.keyword,.token.operator,.token.rule{color:#a71d5d}.token.attr-value,.token.regex,.token.string,.token.url{color:#183691}.token.atrule,.token.boolean,.token.code,.token.command,.token.constant,.token.entity,.token.number,.token.property,.token.symbol{color:#0086b3}.token.prolog,.token.selector,.token.tag{color:#63a35c}.token.attr-name,.token.class,.token.class-name,.token.function,.token.id,.token.namespace,.token.pseudo-class,.token.pseudo-element,.token.url-reference .token.variable{color:#795da3}.token.entity{cursor:help}.token.title,.token.title .token.punctuation{font-weight:700;color:#1d3e81}.token.list{color:#ed6a43}.token.inserted{background-color:#eaffea;color:#55a532}.token.deleted{background-color:#ffecec;color:#bd2c00}.token.bold{font-weight:700}.token.italic{font-style:italic}.language-json .token.property{color:#183691}.language-markup .token.tag .token.punctuation{color:#333}.language-css .token.function,code.language-css{color:#0086b3}.language-yaml .token.atrule{color:#63a35c}code.language-yaml{color:#183691}.language-ruby .token.function{color:#333}.language-markdown .token.url{color:#795da3}.language-makefile .token.symbol{color:#795da3}.language-makefile .token.variable{color:#183691}.language-makefile .token.builtin{color:#0086b3}.language-bash .token.keyword{color:#0086b3}pre[data-line]{position:relative;padding:1em 0 1em 3em}pre[data-line] .line-highlight-wrapper{position:absolute;top:0;left:0;background-color:transparent;display:block;width:100%}pre[data-line] .line-highlight{position:absolute;left:0;right:0;padding:inherit 0;margin-top:1em;background:hsla(24,20%,50%,.08);background:linear-gradient(to right,hsla(24,20%,50%,.1) 70%,hsla(24,20%,50%,0));pointer-events:none;line-height:inherit;white-space:pre}pre[data-line] .line-highlight:before,pre[data-line] .line-highlight[data-end]:after{content:attr(data-start);position:absolute;top:.4em;left:.6em;min-width:1em;padding:0 .5em;background-color:hsla(24,20%,50%,.4);color:#f4f1ef;font:bold 65%/1.5 sans-serif;text-align:center;vertical-align:.3em;border-radius:999px;text-shadow:none;box-shadow:0 1px #fff}pre[data-line] .line-highlight[data-end]:after{content:attr(data-end);top:auto;bottom:.4em}html body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,freesans,sans-serif;font-size:16px;line-height:1.6;color:#333;background-color:#fff;overflow:initial;box-sizing:border-box;word-wrap:break-word}html body>:first-child{margin-top:0}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{line-height:1.2;margin-top:1em;margin-bottom:16px;color:#000}html body h1{font-size:2.25em;font-weight:300;padding-bottom:.3em}html body h2{font-size:1.75em;font-weight:400;padding-bottom:.3em}html body h3{font-size:1.5em;font-weight:500}html body h4{font-size:1.25em;font-weight:600}html body h5{font-size:1.1em;font-weight:600}html body h6{font-size:1em;font-weight:600}html body h1,html body h2,html body h3,html body h4,html body h5{font-weight:600}html body h5{font-size:1em}html body h6{color:#5c5c5c}html body strong{color:#000}html body del{color:#5c5c5c}html body a:not([href]){color:inherit;text-decoration:none}html body a{color:#08c;text-decoration:none}html body a:hover{color:#00a3f5;text-decoration:none}html body img{max-width:100%}html body>p{margin-top:0;margin-bottom:16px;word-wrap:break-word}html body>ol,html body>ul{margin-bottom:16px}html body ol,html body ul{padding-left:2em}html body ol.no-list,html body ul.no-list{padding:0;list-style-type:none}html body ol ol,html body ol ul,html body ul ol,html body ul ul{margin-top:0;margin-bottom:0}html body li{margin-bottom:0}html body li.task-list-item{list-style:none}html body li>p{margin-top:0;margin-bottom:0}html body .task-list-item-checkbox{margin:0 .2em .25em -1.8em;vertical-align:middle}html body .task-list-item-checkbox:hover{cursor:pointer}html body blockquote{margin:16px 0;font-size:inherit;padding:0 15px;color:#5c5c5c;background-color:#f0f0f0;border-left:4px solid #d6d6d6}html body blockquote>:first-child{margin-top:0}html body blockquote>:last-child{margin-bottom:0}html body hr{height:4px;margin:32px 0;background-color:#d6d6d6;border:0 none}html body table{margin:10px 0 15px 0;border-collapse:collapse;border-spacing:0;display:block;width:100%;overflow:auto;word-break:normal;word-break:keep-all}html body table th{font-weight:700;color:#000}html body table td,html body table th{border:1px solid #d6d6d6;padding:6px 13px}html body dl{padding:0}html body dl dt{padding:0;margin-top:16px;font-size:1em;font-style:italic;font-weight:700}html body dl dd{padding:0 16px;margin-bottom:16px}html body code{font-family:Menlo,Monaco,Consolas,'Courier New',monospace;font-size:.85em;color:#000;background-color:#f0f0f0;border-radius:3px;padding:.2em 0}html body code::after,html body code::before{letter-spacing:-.2em;content:'\00a0'}html body pre>code{padding:0;margin:0;word-break:normal;white-space:pre;background:0 0;border:0}html body .highlight{margin-bottom:16px}html body .highlight pre,html body pre{padding:1em;overflow:auto;line-height:1.45;border:#d6d6d6;border-radius:3px}html body .highlight pre{margin-bottom:0;word-break:normal}html body pre code,html body pre tt{display:inline;max-width:initial;padding:0;margin:0;overflow:initial;line-height:inherit;word-wrap:normal;background-color:transparent;border:0}html body pre code:after,html body pre code:before,html body pre tt:after,html body pre tt:before{content:normal}html body blockquote,html body dl,html body ol,html body p,html body pre,html body ul{margin-top:0;margin-bottom:16px}html body kbd{color:#000;border:1px solid #d6d6d6;border-bottom:2px solid #c7c7c7;padding:2px 4px;background-color:#f0f0f0;border-radius:3px}@media print{html body{background-color:#fff}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{color:#000;page-break-after:avoid}html body blockquote{color:#5c5c5c}html body pre{page-break-inside:avoid}html body table{display:table}html body img{display:block;max-width:100%;max-height:100%}html body code,html body pre{word-wrap:break-word;white-space:pre}}.markdown-preview{width:100%;height:100%;box-sizing:border-box}.markdown-preview ul{list-style:disc}.markdown-preview ul ul{list-style:circle}.markdown-preview ul ul ul{list-style:square}.markdown-preview ol{list-style:decimal}.markdown-preview ol ol,.markdown-preview ul ol{list-style-type:lower-roman}.markdown-preview ol ol ol,.markdown-preview ol ul ol,.markdown-preview ul ol ol,.markdown-preview ul ul ol{list-style-type:lower-alpha}.markdown-preview .newpage,.markdown-preview .pagebreak{page-break-before:always}.markdown-preview pre.line-numbers{position:relative;padding-left:3.8em;counter-reset:linenumber}.markdown-preview pre.line-numbers>code{position:relative}.markdown-preview pre.line-numbers .line-numbers-rows{position:absolute;pointer-events:none;top:1em;font-size:100%;left:0;width:3em;letter-spacing:-1px;border-right:1px solid #999;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.markdown-preview pre.line-numbers .line-numbers-rows>span{pointer-events:none;display:block;counter-increment:linenumber}.markdown-preview pre.line-numbers .line-numbers-rows>span:before{content:counter(linenumber);color:#999;display:block;padding-right:.8em;text-align:right}.markdown-preview .mathjax-exps .MathJax_Display{text-align:center!important}.markdown-preview:not([data-for=preview]) .code-chunk .code-chunk-btn-group{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .status{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .output-div{margin-bottom:16px}.markdown-preview .md-toc{padding:0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link div,.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}.markdown-preview .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}.scrollbar-style::-webkit-scrollbar{width:8px}.scrollbar-style::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}.scrollbar-style::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode]){position:relative;width:100%;height:100%;top:0;left:0;margin:0;padding:0;overflow:auto}html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{position:relative;top:0;min-height:100vh}@media screen and (min-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em calc(50% - 457px + 2em)}}@media screen and (max-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{font-size:14px!important;padding:1em}}@media print{html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{display:none}}html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{position:fixed;bottom:8px;left:8px;font-size:28px;cursor:pointer;color:inherit;z-index:99;width:32px;text-align:center;opacity:.4}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] #sidebar-toc-btn{opacity:1}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc{position:fixed;top:0;left:0;width:300px;height:100%;padding:32px 0 48px 0;font-size:14px;box-shadow:0 0 4px rgba(150,150,150,.33);box-sizing:border-box;overflow:auto;background-color:inherit}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar{width:8px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc a{text-decoration:none}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc{padding:0 16px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link div,html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{left:300px;width:calc(100% - 300px);padding:2em calc(50% - 457px - 300px / 2);margin:0;box-sizing:border-box}@media screen and (max-width:1274px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{width:100%}}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .markdown-preview{left:50%;transform:translateX(-50%)}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .md-sidebar-toc{display:none}
+/* Please visit the URL below for more information: */
+/*   https://shd101wyy.github.io/markdown-preview-enhanced/#/customize-css */
+
+      </style>
+      <!-- The content below will be included at the end of the <head> element. --><script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script></head><body for="html-export">
+    
+    
+      <div class="crossnote markdown-preview  ">
+      
+<h1 id="データベースのテーブル情報">データベースのテーブル情報 </h1>
+<p>本項では、本アプリケーションが使用するデータベースのテーブルについて説明します。</p>
+<blockquote>
+<p><a href="../README.html">全体の目次に戻る</a></p>
+</blockquote>
+<h2 id="目次">目次 </h2>
+<ul>
+<li><a href="#%E7%9B%AE%E6%AC%A1">目次</a></li>
+<li><a href="#%E6%A6%82%E8%A6%81">概要</a></li>
+<li><a href="#%E3%83%A6%E3%83%BC%E3%82%B6%E3%83%BC%E6%83%85%E5%A0%B1-users">ユーザー情報 (users)</a></li>
+<li><a href="#%E3%82%B0%E3%83%AB%E3%83%BC%E3%83%97-groups">グループ (groups)</a></li>
+<li><a href="#%E5%BD%B9%E8%81%B7-positions">役職 (positions)</a></li>
+<li><a href="#%E3%83%97%E3%83%AD%E3%82%B8%E3%82%A7%E3%82%AF%E3%83%88-projects">プロジェクト (projects)</a></li>
+<li><a href="#%E5%8F%96%E5%BC%95%E5%85%88-company">取引先 (company)</a></li>
+<li><a href="#%E7%A2%BA%E5%AE%9A%E6%B8%88%E3%81%BF%E6%9C%AA%E5%87%BA%E5%8A%9B%E4%BB%95%E8%A8%B3-fix_journals">確定済み未出力仕訳 (fix_journals)</a></li>
+<li><a href="#%E3%83%95%E3%82%A9%E3%83%BC%E3%83%A0-forms">フォーム (forms)</a></li>
+<li><a href="#%E7%94%B3%E8%AB%8B%E6%9B%B8-requests">申請書 (requests)</a>
+<ul>
+<li><a href="#%E3%83%A1%E3%82%A4%E3%83%B3-requests">メイン (requests)</a></li>
+<li><a href="#customized_items">customized_items</a></li>
+<li><a href="#expense">expense</a></li>
+<li><a href="#payment">payment</a></li>
+<li><a href="#ec">ec</a></li>
+<li><a href="#approval_process">approval_process</a></li>
+<li><a href="#viewers">viewers</a></li>
+<li><a href="#%E5%A4%89%E6%9B%B4%E5%B1%A5%E6%AD%B4-modify_logs">変更履歴 (modify_logs)</a></li>
+<li><a href="#%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB-files">ファイル (files)</a></li>
+<li><a href="#%E7%94%B3%E8%AB%8B%E6%9B%B8-requests-%E3%81%BE%E3%81%A8%E3%82%81">申請書 (requests) まとめ</a></li>
+</ul>
+</li>
+</ul>
+<h2 id="概要">概要 </h2>
+<p>ジョブカンAPIで取得できるデータのうち、本アプリケーションで取得しているデータとテーブルとの対応関係を以下に示します。テーブル名のうち、左に🔵が付与されているものは最上位のテーブルとなります。</p>
+<p><strong>表</strong> ジョブカンAPIとテーブルの対応関係</p>
+<table>
+<thead>
+<tr>
+<th>ジョブカンAPI</th>
+<th>テーブル</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ユーザー情報</td>
+<td>🔵<code>users</code><br><code>user_groups</code><br><code>user_positions</code><br><code>user_bank_accounts</code></td>
+</tr>
+<tr>
+<td>グループ</td>
+<td>🔵<code>groups</code></td>
+</tr>
+<tr>
+<td>役職</td>
+<td>🔵<code>positions</code></td>
+</tr>
+<tr>
+<td>申請書</td>
+<td>🔵<code>requests</code><br><code>customized_items</code><br><code>generic_masters</code><br><code>generic_master_additional_items</code><br><code>table_data</code><br><code>expense</code><br><code>expense_specifics</code><br><code>expense_specific_rows</code><br><code>custom_items</code><br><code>custom_item_values</code><br><code>custom_item_value_extension_items</code><br><code>payment</code><br><code>payment_specifics</code><br><code>payment_specific_rows</code><br><code>ec</code><br><code>shipping_address</code><br><code>ec_specifics</code><br><code>ec_specific_rows</code><br><code>approval_process</code><br><code>approval_route_modify_logs</code><br><code>approval_steps</code><br><code>approvers</code><br><code>comments</code><br><code>comment_associations</code><br><code>viewers</code><br><code>modify_logs</code><br><code>modify_log_details</code><br><code>modify_log_detail_specifics</code><br><code>files</code><br><code>file_associations</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="ユーザー情報-users">ユーザー情報 (users) </h2>
+<p>ジョブカンに登録されているユーザー情報を格納するテーブルです。ユーザー情報には、ユーザーの基本情報と、ユーザーが所属するグループや役職、銀行口座情報が含まれます。</p>
+<div class="mermaid">erDiagram
+    users ||--o{ user_groups : ""
+    users ||--o{ user_positions : ""
+    users ||--o| user_bank_accounts : ""
+
+    groups ||--o{ user_groups : ""
+    groups ||--o{ user_positions : ""
+    positions ||--o{ user_positions : ""
+
+users {
+    INTEGER id PK "管理用"
+    TEXT user_code
+    TEXT email
+    TEXT last_name
+    TEXT first_name
+    INTEGER is_approver
+    INTEGER user_role
+    TEXT memo
+}
+
+user_groups {
+    INTEGER id PK "管理用"
+    INTEGER user_id FK "user.id"
+    TEXT group_code FK "groups.group_code"
+}
+
+user_positions {
+    INTEGER id PK "管理用"
+    INTEGER user_id FK "user.id"
+    TEXT position_code FK "positions.position_code"
+    TEXT group_code FK "groups.group_code"
+}
+
+user_bank_accounts {
+    INTEGER user_id PK "user.id"
+    TEXT bank_code
+    TEXT bank_name
+    TEXT bank_name_kana
+    TEXT branch_code
+    TEXT branch_name
+    TEXT branch_name_kana
+    TEXT bank_account_type_code
+    TEXT bank_account_code
+    TEXT bank_account_name_kana
+}
+</div><p><strong>図</strong> ユーザー情報テーブルのER図．<code>管理用</code>と書かれている部分は元データには存在しないキーです．また、複合UNIQUE制約については省略しています．</p>
+<h2 id="グループ-groups">グループ (groups) </h2>
+<p>ジョブカンに登録されているグループ情報を格納するテーブルです。グループ情報には、グループの基本情報と、グループに所属するユーザー情報が含まれます。</p>
+<div class="mermaid">erDiagram
+    groups ||--o{ user_groups : ""
+    groups ||--o{ user_positions : ""
+
+groups {
+    TEXT group_code PK
+    TEXT group_name
+    TEXT parent_group_code
+    TEXT description
+}
+</div><p><strong>図</strong> グループテーブルのER図．<code>user_groups</code>と<code>user_positions</code>は<a href="#%E3%83%A6%E3%83%BC%E3%82%B6%E3%83%BC%E6%83%85%E5%A0%B1-users">ユーザー情報</a>のテーブルとの関連を示しています</p>
+<h2 id="役職-positions">役職 (positions) </h2>
+<p>ジョブカンに登録されている役職情報を格納するテーブルです。役職情報には、役職の基本情報が含まれます。</p>
+<div class="mermaid">erDiagram
+    positions ||--o{ user_positions : ""
+
+positions {
+    TEXT position_code PK
+    TEXT position_name
+    TEXT description
+}
+</div><p><strong>図</strong> 役職テーブルのER図．<code>user_positions</code>は<a href="#%E3%83%A6%E3%83%BC%E3%82%B6%E3%83%BC%E6%83%85%E5%A0%B1-users">ユーザー情報</a>のテーブルとの関連を示しています</p>
+<h2 id="プロジェクト-projects">プロジェクト (projects) </h2>
+<p>ジョブカンに登録されているプロジェクト情報を格納するテーブルです。プロジェクト情報には、プロジェクトの基本情報が含まれます。</p>
+<div class="mermaid">erDiagram
+    projects
+
+projects {
+    TEXT project_code PK
+    TEXT project_name
+}
+</div><p><strong>図</strong> プロジェクトテーブルのER図．</p>
+<h2 id="取引先-company">取引先 (company) </h2>
+<p>ジョブカンに登録されている取引先情報を格納するテーブルです。取引先情報には、取引先の基本情報が含まれます。</p>
+<p>ここで、<code>bank_account_type_code</code>は<code>"1"</code>などの数字で表されていますが、確認できる範囲では以下のように対応しているようです。</p>
+<ul>
+<li><code>"1"</code>: 普通</li>
+<li><code>"2"</code>: 当座</li>
+<li><code>"9"</code>: その他</li>
+</ul>
+<div class="mermaid">erDiagram
+    company
+
+company {
+    TEXT company_code PK
+    TEXT company_name
+    TEXT zip_code
+    TEXT address
+    TEXT bank_code
+    TEXT bank_name
+    TEXT branch_code
+    TEXT branch_name
+    TEXT bank_account_type_code
+    TEXT bank_account_code
+    TEXT bank_account_name_kana
+    TEXT invoice_registrated_number
+}
+</div><p><strong>図</strong> 取引先テーブルのER図．</p>
+<h2 id="確定済み未出力仕訳-fix_journals">確定済み未出力仕訳 (fix_journals) </h2>
+<p>ジョブカンに登録されている確定済み未出力仕訳情報を格納するテーブルです。APIによるデータ取得時点で未出力の仕訳情報が格納されますが、本ソフトウェアが当テーブルからデータを削除することはありません。このため、古いデータについては出力済みの可能性があります。</p>
+<div class="mermaid">erDiagram
+    fix_journals ||--o{ custom_journal_items : ""
+
+fix_journals {
+    INTEGER journal_id PK
+    TEXT journal_type
+    TEXT journal_date
+    TEXT req_date
+    TEXT journal_summary
+    TEXT view_id
+    INTEGER specifics_row_number
+    TEXT company_code
+    TEXT company_name
+    TEXT user_code
+    TEXT user_name
+    TEXT debit_account_title_code
+    TEXT debit_account_title_name
+    TEXT debit_account_sub_title_code
+    TEXT debit_account_sub_title_name
+    TEXT debit_tax_category_code
+    TEXT debit_tax_category_name
+    INTEGER debit_amount
+    INTEGER debit_tax_amount
+    INTEGER debit_amount_without_tax
+    TEXT debit_group_code
+    TEXT debit_group_name
+    TEXT debit_accounting_group_code
+    TEXT debit_project_code
+    TEXT debit_project_name
+    TEXT credit_account_title_code
+    TEXT credit_account_title_name
+    TEXT credit_account_sub_title_code
+    TEXT credit_account_sub_title_name
+    TEXT credit_tax_category_code
+    TEXT credit_tax_category_name
+    INTEGER credit_amount
+    INTEGER credit_tax_amount
+    INTEGER credit_amount_without_tax
+    TEXT credit_group_code
+    TEXT credit_group_name
+    TEXT credit_accounting_group_code
+    TEXT credit_project_code
+    TEXT credit_project_name
+    TEXT invoice_registrated_number
+}
+
+custom_journal_items {
+    INTEGER journal_id FK
+    TEXT key
+    TEXT value
+    TEXT generic_master_record_code
+}
+</div><p><strong>図</strong> 確定済み未出力仕訳テーブルのER図．</p>
+<h2 id="フォーム-forms">フォーム (forms) </h2>
+<p>ジョブカンに登録されているフォーム情報を格納するテーブルです。フォーム情報には、フォームの基本情報が含まれます。</p>
+<div class="mermaid">erDiagram
+forms {
+    INTEGER id PK
+    TEXT category
+    TEXT form_type
+    TEXT settlement_type
+    TEXT name
+    TEXT view_type
+    TEXT description
+}
+</div><p><strong>図</strong> フォームテーブルのER図．</p>
+<h2 id="申請書-requests">申請書 (requests) </h2>
+<p>ジョブカンに登録されている申請書情報を格納するテーブルです。申請書情報には、申請書の基本情報と、申請書に関連する情報が含まれます。</p>
+<h3 id="メイン-requests">メイン (requests) </h3>
+<p>申請書の基本情報を格納するテーブルです。申請書の基本情報には、申請書のタイトルやステータス、申請書の種類や申請書の提出日時、申請者の情報などが含まれます。</p>
+<div class="mermaid">erDiagram
+    requests ||--o{ customized_items : ""
+    requests ||--o| expense : ""
+    requests ||--o| payment : ""
+    requests ||--o| ec : ""
+    requests ||--o| approval_process : ""
+    requests ||--o{ viewers : ""
+    requests ||--o{ modify_logs : ""
+    requests ||--o{ file_associations : ""
+
+requests{
+    TEXT id PK
+    TEXT title
+    TEXT status
+    INTEGER form_id
+    TEXT form_name
+    TEXT form_type
+    TEXT settlement_type
+    DATETIME applied_date
+    TEXT applicant_code
+    TEXT applicant_last_name
+    TEXT applicant_first_name
+    TEXT applicant_group_name
+    TEXT applicant_group_code
+    TEXT applicant_position_name
+    TEXT proxy_applicant_last_name
+    TEXT proxy_applicant_first_name
+    TEXT group_name
+    TEXT group_code
+    TEXT project_name
+    TEXT project_code
+    TEXT flow_step_name
+    BOOLEAN is_content_changed
+    INTEGER total_amount
+    DATETIME pay_at
+    DATETIME final_approval_period
+    DATETIME final_approved_date
+}
+
+</div><p><strong>図</strong> 申請書テーブルのER図(一部)．<code>requests</code>テーブルと直接の関連があるテーブルのみを示しています</p>
+<h3 id="customized_items">customized_items </h3>
+<div class="mermaid">erDiagram
+    requests ||--o{ customized_items : ""
+
+    customized_items ||--o| generic_masters : ""
+    customized_items ||--o{ file_associations : ""
+    customized_items ||--o{ table_data : ""
+
+    generic_masters ||--o{ generic_master_additional_items : ""
+
+    table_data ||--o{ generic_masters : ""
+
+customized_items {
+    INTEGER id PK "管理用"
+    TEXT request_id FK "requests.id"
+    TEXT title
+    TEXT content
+    INTEGER item_index "管理用・JSON/DB上でのアイテム番号"
+}
+
+table_data {
+    INTEGER id PK "管理用"
+    INTEGER customized_item_id FK "customized_items.id"
+    INTEGER column_number
+    TEXT value
+    INTEGER index_1 "管理用・JSON/DB上での列番号 (二重リストの外側)"
+    INTEGER index_2 "管理用・JSON/DB上での行番号 (二重リストの内側)"
+}
+
+generic_masters {
+    INTEGER id PK "管理用"
+    TEXT record_name
+    TEXT record_code
+    INTEGER customized_item_id FK "customized_items.id"
+    INTEGER table_data_id FK "table_data.id"
+}
+
+generic_master_additional_items {
+    INTEGER id PK "管理用"
+    INTEGER generic_master_id FK "generic_masters.id"
+    TEXT item_value
+    INTEGER item_index "管理用・JSON/DB上でのアイテム番号"
+}
+</div><p><strong>図</strong> customized_itemsテーブルまわりのER図．<code>管理用</code>と書かれている部分は元データには存在しないキーです．また、複合UNIQUE制約については省略しています．</p>
+<h3 id="expense">expense </h3>
+<div class="mermaid">erDiagram
+    requests ||--o| expense : ""
+
+    expense ||--o{ expense_specifics : ""
+    expense_specifics ||--o{ expense_specific_rows : ""
+    expense_specific_rows ||--o{ custom_items : ""
+    expense_specific_rows ||--o{ file_associations : ""
+    custom_items ||--o| custom_item_values : ""
+    custom_item_values ||--o{ custom_item_value_extension_items : ""
+
+expense {
+    INTEGER id PK "管理用"
+    TEXT request_id FK "requests.id"
+    INTEGER amount
+    TEXT related_request_title
+    TEXT related_request_id
+    BOOLEAN use_suspense_payment
+    TEXT content_description
+    INTEGER advanced_payment
+    INTEGER suspense_payment_amount
+}
+
+expense_specifics {
+    INTEGER id PK "管理用"
+    INTEGER expense_id FK "expense.id"
+    TEXT type
+    INTEGER col_number "管理用・JSON/DB上での列番号"
+}
+
+expense_specific_rows {
+    INTEGER id PK "管理用"
+    INTEGER expense_specific_id FK "expense_specifics.id"
+    TEXT row_number
+    DATE use_date
+    TEXT group_name
+    TEXT project_name
+    TEXT content_description
+    TEXT breakdown
+    INTEGER amount
+}
+
+custom_items {
+    INTEGER id PK "管理用"
+    INTEGER expense_specific_row_id FK "expense_specific_rows.id"
+    TEXT name
+    TEXT item_type
+    TEXT value "NULLの場合、値はcustom_item_valuesに格納される"
+    INTEGER item_index "管理用・JSON/DB上でのアイテム番号"
+}
+
+custom_item_values {
+    INTEGER id PK "管理用"
+    INTEGER custom_item_id FK "custom_items.id"
+    TEXT generic_master_code
+    TEXT generic_master_record_name
+    TEXT generic_master_record_code
+    TEXT content
+    TEXT memo
+}
+
+custom_item_value_extension_items {
+    INTEGER id PK "管理用"
+    INTEGER custom_item_value_id FK "custom_item_values.id"
+    TEXT name
+    TEXT value
+    INTEGER item_index "管理用・JSON/DB上でのアイテム番号"
+}
+</div><p><strong>図</strong> expenseテーブルまわりのER図．<code>管理用</code>と書かれている部分は元データには存在しないキーです．また、複合UNIQUE制約については省略しています．</p>
+<h3 id="payment">payment </h3>
+<div class="mermaid">erDiagram
+    requests ||--o| payment : ""
+
+    payment ||--o{ payment_specifics : ""
+    payment_specifics ||--o{ payment_specific_rows : ""
+    payment_specific_rows ||--o{ file_associations : ""
+
+payment {
+    INTEGER id PK "管理用"
+    TEXT request_id FK "requests.id"
+    INTEGER amount
+    TEXT related_request_title
+    TEXT related_request_id
+    TEXT content_description
+}
+
+payment_specifics {
+    INTEGER id PK "管理用"
+    INTEGER payment_id FK "payment.id"
+    TEXT type
+    INTEGER col_number "管理用・JSON/DB上での列番号"
+}
+
+payment_specific_rows {
+    INTEGER id PK "管理用"
+    INTEGER payment_specific_id FK "payment_specifics.id"
+    TEXT company_name
+    TEXT zip_code
+    TEXT address
+    TEXT bank_name
+    TEXT bank_name_kana
+    TEXT bank_account_name_kana
+    INTEGER bank_code
+    INTEGER branch_code
+    TEXT row_number
+    DATE use_date
+    TEXT group_name
+    TEXT project_name
+    TEXT content_description
+    TEXT breakdown
+    INTEGER amount
+}
+</div><p><strong>図</strong> paymentテーブルまわりのER図．<code>管理用</code>と書かれている部分は元データには存在しないキーです．また、複合UNIQUE制約については省略しています．</p>
+<h3 id="ec">ec </h3>
+<div class="mermaid">erDiagram
+    requests ||--o| ec : ""
+
+    ec ||--o| shipping_address : ""
+    ec ||--o{ ec_specifics : ""
+    ec_specifics ||--o{ ec_specific_rows : ""
+
+ec {
+    INTEGER id PK "管理用"
+    TEXT request_id FK "requests.id"
+    TEXT related_request_id
+    TEXT related_request_title
+    TEXT content_description
+    TEXT billing_destination
+    INTEGER shipping_address_id FK "shipping_address.id"
+}
+
+shipping_address {
+    INTEGER id PK "管理用"
+    INTEGER ec_id FK "ec.id"
+    TEXT shipping_address_name
+    TEXT zip_code
+    TEXT country
+    TEXT state
+    TEXT city
+    TEXT address1
+    TEXT address2
+    TEXT company_name
+    TEXT contact_name
+    TEXT tel
+    TEXT email
+}
+
+ec_specifics {
+    INTEGER id PK "管理用"
+    INTEGER ec_id FK "ec.id"
+    TEXT order_id
+    DATETIME retention_deadline
+    INTEGER tax_amount
+    INTEGER shipping_amount
+    INTEGER total_price
+    INTEGER total_amount
+}
+
+ec_specific_rows {
+    INTEGER id PK "管理用"
+    INTEGER ec_specific_id FK "ec_specifics.id"
+    INTEGER row_number
+    TEXT item_name
+    TEXT item_url
+    TEXT item_id
+    TEXT manufacturer_name
+    TEXT sold_by
+    TEXT fulfilled_by
+    INTEGER unit_price
+    TEXT quantity
+    INTEGER subtotal
+}
+</div><p><strong>図</strong> ecテーブルまわりのER図．<code>管理用</code>と書かれている部分は元データには存在しないキーです．また、複合UNIQUE制約については省略しています．</p>
+<h3 id="approval_process">approval_process </h3>
+<div class="mermaid">erDiagram
+    requests ||--o| approval_process : ""
+
+    approval_process ||--o{ approval_route_modify_logs : ""
+    approval_process ||--o{ approval_steps : ""
+    approval_steps ||--o{ approvers : ""
+    approval_steps ||--o{ comment_associations : ""
+    approval_steps ||--o{ file_associations : ""
+    approval_process ||--o{ comment_associations : ""
+    approval_process ||--o{ file_associations : ""
+
+    comments ||--o{ comment_associations : ""
+
+approval_process {
+    INTEGER id PK "管理用"
+    TEXT request_id FK "requests.id"
+    BOOLEAN is_route_changed_by_applicant
+}
+
+approval_route_modify_logs {
+    INTEGER id PK "管理用"
+    INTEGER approval_process_id FK "approval_process.id"
+    DATETIME date
+    TEXT user_name
+    INTEGER log_index "管理用・JSON/DB上でのログ番号"
+}
+
+approval_steps {
+    INTEGER id PK "管理用"
+    INTEGER approval_process_id FK "approval_process.id"
+    TEXT name
+    TEXT condition
+    TEXT status
+    INTEGER step_index "管理用・JSON/DB上でのステップ番号"
+}
+
+approvers {
+    INTEGER id PK "管理用"
+    INTEGER approval_step_id FK "approval_steps.id"
+    TEXT status
+    DATETIME approved_date
+    TEXT approver_name
+    TEXT approver_code
+    TEXT proxy_approver_name
+    TEXT proxy_approver_code
+    INTEGER approver_index "管理用・JSON/DB上でのapprover番号"
+}
+
+comments {
+    INTEGER id PK "管理用"
+    TEXT user_name
+    DATETIME date
+    TEXT text
+    BOOLEAN deleted
+}
+
+comment_associations {
+    INTEGER id PK "管理用"
+    INTEGER comment_id FK "comments.id"
+    INTEGER approval_step_id FK "approval_steps.id"
+    INTEGER approval_after_completion_id FK "approval_process.id"
+}
+</div><p><strong>図</strong> approval_processテーブルまわりのER図．<code>管理用</code>と書かれている部分は元データには存在しないキーです．また、複合UNIQUE制約については省略しています．</p>
+<h3 id="viewers">viewers </h3>
+<div class="mermaid">erDiagram
+    requests ||--o{ viewers : ""
+
+viewers {
+    INTEGER id PK "管理用"
+    TEXT request_id FK "requests.id"
+    TEXT user_name
+    TEXT status
+    TEXT group_name
+    TEXT position
+    INTEGER viewer_index "管理用・JSON/DB上でのビュー番号"
+}
+</div><p><strong>図</strong> viewersテーブルまわりのER図．<code>管理用</code>と書かれている部分は元データには存在しないキーです．また、複合UNIQUE制約については省略しています．</p>
+<h3 id="変更履歴-modify_logs">変更履歴 (modify_logs) </h3>
+<p>申請書の変更履歴を格納するテーブルです。変更履歴には、その変更が行われた日時やユーザー名、変更内容が含まれます。</p>
+<div class="mermaid">erDiagram
+    requests ||--o{ modify_logs : ""
+
+    modify_logs ||--o{ modify_log_details : ""
+    modify_log_details ||--o{ modify_log_detail_specifics : ""
+
+modify_logs {
+    INTEGER id PK "管理用"
+    TEXT request_id FK "requests.id"
+    DATETIME date
+    TEXT user_name
+    INTEGER log_index "管理用・JSON/DB上でのログ番号"
+}
+
+modify_log_details {
+    INTEGER id PK "管理用"
+    INTEGER modify_log_id FK "modify_logs.id"
+    TEXT title
+    TEXT old_value
+    TEXT new_value
+    TEXT log_type
+    INTEGER log_detail_index "管理用・JSON/DB上での番号"
+}
+
+modify_log_detail_specifics {
+    INTEGER id PK "管理用"
+    INTEGER modify_log_detail_id FK "modify_log_details.id"
+    TEXT status
+    TEXT difference
+    INTEGER specific_index "管理用・JSON/DB上でのステップ番号"
+}
+</div><p><strong>図</strong> modify_logsテーブルまわりのER図．<code>管理用</code>と書かれている部分は元データには存在しないキーです．また、複合UNIQUE制約については省略しています．</p>
+<h3 id="ファイル-files">ファイル (files) </h3>
+<p>申請書に添付されたファイル情報を格納するテーブルです。ファイル情報には、ファイルの基本情報およびどこに紐づいているかが含まれます。</p>
+<div class="mermaid">erDiagram
+    requests ||--o{ file_associations : ""
+    customized_items ||--o{ file_associations : ""
+    expense_specific_rows ||--o{ file_associations : ""
+    payment_specific_rows ||--o{ file_associations : ""
+    approval_steps ||--o{ file_associations : ""
+    approval_process ||--o{ file_associations : ""
+    files ||--o{ file_associations : ""
+
+files {
+    TEXT id PK
+    TEXT name
+    TEXT type
+    TEXT user_name
+    DATETIME date
+    BOOLEAN deleted
+}
+
+file_associations {
+    INTEGER id PK "管理用"
+    TEXT request_id FK "requests.id"
+    TEXT file_id FK "files.id"
+    INTEGER customized_item_id FK "customized_items.id"
+    INTEGER expense_specific_row_id FK "expense_specific_rows.id"
+    INTEGER payment_specific_row_id FK "payment_specific_rows.id"
+    INTEGER approval_step_id FK "approval_steps.id"
+    INTEGER approval_after_completion_id FK "approval_process.id"
+    INTEGER default_attachment "request_id に何回 default_attachment として登録されるか"
+}
+</div><p><strong>図</strong> filesテーブルまわりのER図．<code>管理用</code>と書かれている部分は元データには存在しないキーです．また、複合UNIQUE制約については省略しています．</p>
+<h3 id="申請書-requests-まとめ">申請書 (requests) まとめ </h3>
+<p>作成したテーブルのER図を以下に作成します。</p>
+<div class="mermaid">erDiagram
+    requests ||--o{ customized_items : ""
+    requests ||--o| expense : ""
+    requests ||--o| payment : ""
+    requests ||--o| ec : ""
+    requests ||--o| approval_process : ""
+    requests ||--o{ viewers : ""
+    requests ||--o{ modify_logs : ""
+    requests ||--o{ file_associations : ""
+
+    customized_items ||--o| generic_masters : ""
+    customized_items ||--o{ file_associations : ""
+    customized_items ||--o{ table_data : ""
+    table_data ||--o{ generic_masters : ""
+    generic_masters ||--o{ generic_master_additional_items : ""
+
+    expense ||--o{ expense_specifics : ""
+    expense_specifics ||--o{ expense_specific_rows : ""
+    expense_specific_rows ||--o{ custom_items : ""
+    expense_specific_rows ||--o{ file_associations : ""
+    custom_items ||--o| custom_item_values : ""
+    custom_item_values ||--o{ custom_item_value_extension_items : ""
+
+    payment ||--o{ payment_specifics : ""
+    payment_specifics ||--o{ payment_specific_rows : ""
+    payment_specific_rows ||--o{ file_associations : ""
+
+    ec ||--o| shipping_address : ""
+    ec ||--o| ec_specifics : ""
+    ec_specifics ||--o{ ec_specific_rows : ""
+
+    approval_process ||--o{ approval_route_modify_logs : ""
+    approval_process ||--o{ approval_steps : ""
+    approval_steps ||--o{ approvers : ""
+    approval_steps ||--o{ comment_associations : ""
+    approval_steps ||--o{ file_associations : ""
+    approval_process ||--o{ comment_associations : ""
+    approval_process ||--o{ file_associations : ""
+
+    modify_logs ||--o{ modify_log_details : ""
+    modify_log_details ||--o{ modify_log_detail_specifics : ""
+
+    files ||--o{ file_associations : ""
+    comments ||--o{ comment_associations : ""
+
+requests {
+    TEXT id
+    TEXT title
+    TEXT status
+    INTEGER form_id
+    TEXT form_name
+    TEXT form_type
+    TEXT settlement_type
+    DATETIME applied_date
+    TEXT applicant_code
+    TEXT applicant_last_name
+    TEXT applicant_first_name
+    TEXT applicant_group_name
+    TEXT applicant_group_code
+    TEXT applicant_position_name
+    TEXT proxy_applicant_last_name
+    TEXT proxy_applicant_first_name
+    TEXT group_name
+    TEXT group_code
+    TEXT project_name
+    TEXT project_code
+    TEXT flow_step_name
+    BOOLEAN is_content_changed
+    INTEGER total_amount
+    DATETIME pay_at
+    DATETIME final_approval_period
+    DATETIME final_approved_date
+}
+
+customized_items {
+    INTEGER id
+    TEXT request_id
+    TEXT title
+    TEXT content
+    INTEGER item_index "JSON/DB上でのアイテム番号"
+}
+
+generic_masters {
+    INTEGER id
+    TEXT record_name
+    TEXT record_code
+    INTEGER customized_item_id
+    INTEGER table_data_id
+}
+
+generic_master_additional_items {
+    INTEGER id
+    INTEGER generic_master_id
+    TEXT item_value
+    INTEGER item_index "JSON/DB上でのアイテム番号"
+}
+
+table_data {
+    INTEGER id
+    INTEGER customized_item_id
+    INTEGER column_number
+    TEXT value
+    INTEGER index_1 "JSON/DB上での列番号 (二重リストの外側)"
+    INTEGER index_2 "JSON/DB上での行番号 (二重リストの内側)"
+}
+
+expense {
+    INTEGER id
+    TEXT request_id
+    INTEGER amount
+    TEXT related_request_title
+    TEXT related_request_id
+    BOOLEAN use_suspense_payment
+    TEXT content_description
+    INTEGER advanced_payment
+    INTEGER suspense_payment_amount
+}
+
+expense_specifics {
+    INTEGER id
+    INTEGER expense_id
+    TEXT type
+    INTEGER col_number "JSON/DB上での列番号"
+}
+
+expense_specific_rows {
+    INTEGER id
+    INTEGER expense_specific_id
+    TEXT row_number
+    DATE use_date
+    TEXT group_name
+    TEXT project_name
+    TEXT content_description
+    TEXT breakdown
+    INTEGER amount
+}
+
+custom_items {
+    INTEGER id
+    INTEGER expense_specific_row_id
+    TEXT name
+    TEXT item_type
+    TEXT value "NULLの場合、値はcustom_item_valuesに格納される"
+    INTEGER item_index "JSON/DB上でのアイテム番号"
+}
+
+custom_item_values {
+    INTEGER id
+    INTEGER custom_item_id
+    TEXT generic_master_code
+    TEXT generic_master_record_name
+    TEXT generic_master_record_code
+    TEXT content
+    TEXT memo
+}
+
+custom_item_value_extension_items {
+    INTEGER id
+    INTEGER custom_item_value_id
+    TEXT name
+    TEXT value
+    INTEGER item_index "JSON/DB上でのアイテム番号"
+}
+
+payment {
+    INTEGER id
+    TEXT request_id
+    INTEGER amount
+    TEXT related_request_title
+    TEXT related_request_id
+    TEXT content_description
+}
+
+payment_specifics {
+    INTEGER id
+    INTEGER payment_id
+    TEXT type
+    INTEGER col_number "JSON/DB上での列番号"
+}
+
+payment_specific_rows {
+    INTEGER id
+    INTEGER payment_specific_id
+    TEXT company_name
+    TEXT zip_code
+    TEXT address
+    TEXT bank_name
+    TEXT bank_name_kana
+    TEXT bank_account_name_kana
+    INTEGER bank_code
+    INTEGER branch_code
+    TEXT row_number
+    DATE use_date
+    TEXT group_name
+    TEXT project_name
+    TEXT content_description
+    TEXT breakdown
+    INTEGER amount
+}
+
+ec {
+    INTEGER id
+    TEXT request_id
+    TEXT related_request_id
+    TEXT related_request_title
+    TEXT content_description
+    TEXT billing_destination
+    INTEGER shipping_address_id
+}
+
+shipping_address {
+    INTEGER id
+    INTEGER ec_id
+    TEXT shipping_address_name
+    TEXT zip_code
+    TEXT country
+    TEXT state
+    TEXT city
+    TEXT address1
+    TEXT address2
+    TEXT company_name
+    TEXT contact_name
+    TEXT tel
+    TEXT email
+}
+
+ec_specifics {
+    INTEGER id
+    INTEGER ec_id
+    TEXT order_id
+    DATETIME retention_deadline
+    INTEGER tax_amount
+    INTEGER shipping_amount
+    INTEGER total_price
+    INTEGER total_amount
+}
+
+ec_specific_rows {
+    INTEGER id
+    INTEGER ec_specific_id
+    INTEGER row_number
+    TEXT item_name
+    TEXT item_url
+    TEXT item_id
+    TEXT manufacturer_name
+    TEXT sold_by
+    TEXT fulfilled_by
+    INTEGER unit_price
+    TEXT quantity
+    INTEGER subtotal
+}
+
+approval_process {
+    INTEGER id
+    TEXT request_id
+    BOOLEAN is_route_changed_by_applicant
+}
+
+approval_route_modify_logs {
+    INTEGER id
+    INTEGER approval_process_id
+    DATETIME date
+    TEXT user_name
+    INTEGER log_index "JSON/DB上でのログ番号"
+}
+
+approval_steps {
+    INTEGER id
+    INTEGER approval_process_id
+    TEXT name
+    TEXT condition
+    TEXT status
+    INTEGER step_index "JSON/DB上でのステップ番号"
+}
+
+approvers {
+    INTEGER id
+    INTEGER approval_step_id
+    TEXT status
+    DATETIME approved_date
+    TEXT approver_name
+    TEXT approver_code
+    TEXT proxy_approver_name
+    TEXT proxy_approver_code
+    INTEGER approval_index "JSON/DB上でのapprover番号"
+}
+
+comments {
+    INTEGER id
+    TEXT user_name
+    DATETIME date
+    TEXT text
+    BOOLEAN deleted
+}
+
+comment_associations {
+    INTEGER id
+    INTEGER comment_id
+    INTEGER approval_step_id
+    INTEGER approval_after_completion_id "approval_process.id"
+}
+
+viewers {
+    INTEGER id
+    TEXT request_id
+    TEXT user_name
+    TEXT status
+    TEXT group_name
+    TEXT position
+    INTEGER view_index "JSON/DB上でのビュー番号"
+}
+
+modify_logs {
+    INTEGER id
+    TEXT request_id
+    DATETIME date
+    TEXT user_name
+    INTEGER log_index "JSON/DB上でのログ番号"
+}
+
+modify_log_details {
+    INTEGER id
+    INTEGER modify_log_id
+    TEXT title
+    TEXT old_value
+    TEXT new_value
+    TEXT log_type
+    INTEGER log_detail_index "JSON/DB上での番号"
+}
+
+modify_log_detail_specifics {
+    INTEGER id
+    INTEGER modify_log_detail_id
+    TEXT status
+    TEXT difference
+    INTEGER specific_index "JSON/DB上でのステップ番号"
+}
+
+files {
+    TEXT id
+    TEXT name
+    TEXT type
+    TEXT user_name
+    DATETIME date
+    BOOLEAN deleted
+}
+
+file_associations {
+    INTEGER id
+    TEXT request_id
+    TEXT file_id
+    INTEGER customized_item_id
+    INTEGER expense_specific_row_id
+    INTEGER payment_specific_row_id
+    INTEGER approval_step_id
+    INTEGER approval_after_completion_id "approval_process.id"
+    INTEGER default_attachment "request_id に何回 default_attachment として登録されるか"
+}
+</div><hr>
+<blockquote>
+<p><a href="../README.html">全体の目次に戻る</a></p>
+</blockquote>
+
+      </div>
+      
+      
+    
+    
+    <script type="module">
+// TODO: If ZenUML gets integrated into mermaid in the future,
+//      we can remove the following lines.
+
+
+var MERMAID_CONFIG = ({"startOnLoad":false});
+if (typeof MERMAID_CONFIG !== 'undefined') {
+  MERMAID_CONFIG.startOnLoad = false
+  MERMAID_CONFIG.cloneCssStyles = false
+  MERMAID_CONFIG.theme = "default"
+}
+
+mermaid.initialize(MERMAID_CONFIG || {})
+if (typeof(window['Reveal']) !== 'undefined') {
+  function mermaidRevealHelper(event) {
+    var currentSlide = event.currentSlide
+    var diagrams = currentSlide.querySelectorAll('.mermaid')
+    for (var i = 0; i < diagrams.length; i++) {
+      var diagram = diagrams[i]
+      if (!diagram.hasAttribute('data-processed')) {
+        mermaid.init(null, diagram, ()=> {
+          Reveal.slide(event.indexh, event.indexv)
+        })
+      }
+    }
+  }
+  Reveal.addEventListener('slidetransitionend', mermaidRevealHelper)
+  Reveal.addEventListener('ready', mermaidRevealHelper)
+  await mermaid.run({
+    nodes: document.querySelectorAll('.mermaid')
+  })
+} else {
+  await mermaid.run({
+    nodes: document.querySelectorAll('.mermaid')
+  })
+}
+</script>
+    
+    
+    
+  
+    </body></html>

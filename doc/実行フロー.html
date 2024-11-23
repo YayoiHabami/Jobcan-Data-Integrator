@@ -1,0 +1,393 @@
+<!DOCTYPE html><html><head>
+      <title>実行フロー</title>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      
+      <link rel="stylesheet" href="file:///c:\Users\nggen\.vscode\extensions\shd101wyy.markdown-preview-enhanced-0.8.15\crossnote\dependencies\katex\katex.min.css">
+      
+      
+      
+      
+      
+      <style>
+      code[class*=language-],pre[class*=language-]{color:#333;background:0 0;font-family:Consolas,"Liberation Mono",Menlo,Courier,monospace;text-align:left;white-space:pre;word-spacing:normal;word-break:normal;word-wrap:normal;line-height:1.4;-moz-tab-size:8;-o-tab-size:8;tab-size:8;-webkit-hyphens:none;-moz-hyphens:none;-ms-hyphens:none;hyphens:none}pre[class*=language-]{padding:.8em;overflow:auto;border-radius:3px;background:#f5f5f5}:not(pre)>code[class*=language-]{padding:.1em;border-radius:.3em;white-space:normal;background:#f5f5f5}.token.blockquote,.token.comment{color:#969896}.token.cdata{color:#183691}.token.doctype,.token.macro.property,.token.punctuation,.token.variable{color:#333}.token.builtin,.token.important,.token.keyword,.token.operator,.token.rule{color:#a71d5d}.token.attr-value,.token.regex,.token.string,.token.url{color:#183691}.token.atrule,.token.boolean,.token.code,.token.command,.token.constant,.token.entity,.token.number,.token.property,.token.symbol{color:#0086b3}.token.prolog,.token.selector,.token.tag{color:#63a35c}.token.attr-name,.token.class,.token.class-name,.token.function,.token.id,.token.namespace,.token.pseudo-class,.token.pseudo-element,.token.url-reference .token.variable{color:#795da3}.token.entity{cursor:help}.token.title,.token.title .token.punctuation{font-weight:700;color:#1d3e81}.token.list{color:#ed6a43}.token.inserted{background-color:#eaffea;color:#55a532}.token.deleted{background-color:#ffecec;color:#bd2c00}.token.bold{font-weight:700}.token.italic{font-style:italic}.language-json .token.property{color:#183691}.language-markup .token.tag .token.punctuation{color:#333}.language-css .token.function,code.language-css{color:#0086b3}.language-yaml .token.atrule{color:#63a35c}code.language-yaml{color:#183691}.language-ruby .token.function{color:#333}.language-markdown .token.url{color:#795da3}.language-makefile .token.symbol{color:#795da3}.language-makefile .token.variable{color:#183691}.language-makefile .token.builtin{color:#0086b3}.language-bash .token.keyword{color:#0086b3}pre[data-line]{position:relative;padding:1em 0 1em 3em}pre[data-line] .line-highlight-wrapper{position:absolute;top:0;left:0;background-color:transparent;display:block;width:100%}pre[data-line] .line-highlight{position:absolute;left:0;right:0;padding:inherit 0;margin-top:1em;background:hsla(24,20%,50%,.08);background:linear-gradient(to right,hsla(24,20%,50%,.1) 70%,hsla(24,20%,50%,0));pointer-events:none;line-height:inherit;white-space:pre}pre[data-line] .line-highlight:before,pre[data-line] .line-highlight[data-end]:after{content:attr(data-start);position:absolute;top:.4em;left:.6em;min-width:1em;padding:0 .5em;background-color:hsla(24,20%,50%,.4);color:#f4f1ef;font:bold 65%/1.5 sans-serif;text-align:center;vertical-align:.3em;border-radius:999px;text-shadow:none;box-shadow:0 1px #fff}pre[data-line] .line-highlight[data-end]:after{content:attr(data-end);top:auto;bottom:.4em}html body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,freesans,sans-serif;font-size:16px;line-height:1.6;color:#333;background-color:#fff;overflow:initial;box-sizing:border-box;word-wrap:break-word}html body>:first-child{margin-top:0}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{line-height:1.2;margin-top:1em;margin-bottom:16px;color:#000}html body h1{font-size:2.25em;font-weight:300;padding-bottom:.3em}html body h2{font-size:1.75em;font-weight:400;padding-bottom:.3em}html body h3{font-size:1.5em;font-weight:500}html body h4{font-size:1.25em;font-weight:600}html body h5{font-size:1.1em;font-weight:600}html body h6{font-size:1em;font-weight:600}html body h1,html body h2,html body h3,html body h4,html body h5{font-weight:600}html body h5{font-size:1em}html body h6{color:#5c5c5c}html body strong{color:#000}html body del{color:#5c5c5c}html body a:not([href]){color:inherit;text-decoration:none}html body a{color:#08c;text-decoration:none}html body a:hover{color:#00a3f5;text-decoration:none}html body img{max-width:100%}html body>p{margin-top:0;margin-bottom:16px;word-wrap:break-word}html body>ol,html body>ul{margin-bottom:16px}html body ol,html body ul{padding-left:2em}html body ol.no-list,html body ul.no-list{padding:0;list-style-type:none}html body ol ol,html body ol ul,html body ul ol,html body ul ul{margin-top:0;margin-bottom:0}html body li{margin-bottom:0}html body li.task-list-item{list-style:none}html body li>p{margin-top:0;margin-bottom:0}html body .task-list-item-checkbox{margin:0 .2em .25em -1.8em;vertical-align:middle}html body .task-list-item-checkbox:hover{cursor:pointer}html body blockquote{margin:16px 0;font-size:inherit;padding:0 15px;color:#5c5c5c;background-color:#f0f0f0;border-left:4px solid #d6d6d6}html body blockquote>:first-child{margin-top:0}html body blockquote>:last-child{margin-bottom:0}html body hr{height:4px;margin:32px 0;background-color:#d6d6d6;border:0 none}html body table{margin:10px 0 15px 0;border-collapse:collapse;border-spacing:0;display:block;width:100%;overflow:auto;word-break:normal;word-break:keep-all}html body table th{font-weight:700;color:#000}html body table td,html body table th{border:1px solid #d6d6d6;padding:6px 13px}html body dl{padding:0}html body dl dt{padding:0;margin-top:16px;font-size:1em;font-style:italic;font-weight:700}html body dl dd{padding:0 16px;margin-bottom:16px}html body code{font-family:Menlo,Monaco,Consolas,'Courier New',monospace;font-size:.85em;color:#000;background-color:#f0f0f0;border-radius:3px;padding:.2em 0}html body code::after,html body code::before{letter-spacing:-.2em;content:'\00a0'}html body pre>code{padding:0;margin:0;word-break:normal;white-space:pre;background:0 0;border:0}html body .highlight{margin-bottom:16px}html body .highlight pre,html body pre{padding:1em;overflow:auto;line-height:1.45;border:#d6d6d6;border-radius:3px}html body .highlight pre{margin-bottom:0;word-break:normal}html body pre code,html body pre tt{display:inline;max-width:initial;padding:0;margin:0;overflow:initial;line-height:inherit;word-wrap:normal;background-color:transparent;border:0}html body pre code:after,html body pre code:before,html body pre tt:after,html body pre tt:before{content:normal}html body blockquote,html body dl,html body ol,html body p,html body pre,html body ul{margin-top:0;margin-bottom:16px}html body kbd{color:#000;border:1px solid #d6d6d6;border-bottom:2px solid #c7c7c7;padding:2px 4px;background-color:#f0f0f0;border-radius:3px}@media print{html body{background-color:#fff}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{color:#000;page-break-after:avoid}html body blockquote{color:#5c5c5c}html body pre{page-break-inside:avoid}html body table{display:table}html body img{display:block;max-width:100%;max-height:100%}html body code,html body pre{word-wrap:break-word;white-space:pre}}.markdown-preview{width:100%;height:100%;box-sizing:border-box}.markdown-preview ul{list-style:disc}.markdown-preview ul ul{list-style:circle}.markdown-preview ul ul ul{list-style:square}.markdown-preview ol{list-style:decimal}.markdown-preview ol ol,.markdown-preview ul ol{list-style-type:lower-roman}.markdown-preview ol ol ol,.markdown-preview ol ul ol,.markdown-preview ul ol ol,.markdown-preview ul ul ol{list-style-type:lower-alpha}.markdown-preview .newpage,.markdown-preview .pagebreak{page-break-before:always}.markdown-preview pre.line-numbers{position:relative;padding-left:3.8em;counter-reset:linenumber}.markdown-preview pre.line-numbers>code{position:relative}.markdown-preview pre.line-numbers .line-numbers-rows{position:absolute;pointer-events:none;top:1em;font-size:100%;left:0;width:3em;letter-spacing:-1px;border-right:1px solid #999;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.markdown-preview pre.line-numbers .line-numbers-rows>span{pointer-events:none;display:block;counter-increment:linenumber}.markdown-preview pre.line-numbers .line-numbers-rows>span:before{content:counter(linenumber);color:#999;display:block;padding-right:.8em;text-align:right}.markdown-preview .mathjax-exps .MathJax_Display{text-align:center!important}.markdown-preview:not([data-for=preview]) .code-chunk .code-chunk-btn-group{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .status{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .output-div{margin-bottom:16px}.markdown-preview .md-toc{padding:0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link div,.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}.markdown-preview .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}.scrollbar-style::-webkit-scrollbar{width:8px}.scrollbar-style::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}.scrollbar-style::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode]){position:relative;width:100%;height:100%;top:0;left:0;margin:0;padding:0;overflow:auto}html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{position:relative;top:0;min-height:100vh}@media screen and (min-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em calc(50% - 457px + 2em)}}@media screen and (max-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{font-size:14px!important;padding:1em}}@media print{html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{display:none}}html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{position:fixed;bottom:8px;left:8px;font-size:28px;cursor:pointer;color:inherit;z-index:99;width:32px;text-align:center;opacity:.4}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] #sidebar-toc-btn{opacity:1}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc{position:fixed;top:0;left:0;width:300px;height:100%;padding:32px 0 48px 0;font-size:14px;box-shadow:0 0 4px rgba(150,150,150,.33);box-sizing:border-box;overflow:auto;background-color:inherit}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar{width:8px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc a{text-decoration:none}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc{padding:0 16px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link div,html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{left:300px;width:calc(100% - 300px);padding:2em calc(50% - 457px - 300px / 2);margin:0;box-sizing:border-box}@media screen and (max-width:1274px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{width:100%}}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .markdown-preview{left:50%;transform:translateX(-50%)}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .md-sidebar-toc{display:none}
+/* Please visit the URL below for more information: */
+/*   https://shd101wyy.github.io/markdown-preview-enhanced/#/customize-css */
+
+      </style>
+      <!-- The content below will be included at the end of the <head> element. --><script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script></head><body for="html-export">
+    
+    
+      <div class="crossnote markdown-preview  ">
+      
+<h1 id="実行フロー">実行フロー </h1>
+<p>本項では、本アプリケーションの実行フローについて説明します。</p>
+<blockquote>
+<p><a href="../README.html">全体の目次に戻る</a></p>
+</blockquote>
+<h2 id="目次">目次 </h2>
+<ul>
+<li><a href="#%E7%9B%AE%E6%AC%A1">目次</a></li>
+<li><a href="#%E3%83%A1%E3%82%A4%E3%83%B3">メイン</a>
+<ul>
+<li><a href="#%E5%A4%A7%E3%81%BE%E3%81%8B%E3%81%AA%E5%87%A6%E7%90%86%E3%81%AE%E6%B5%81%E3%82%8C-progressstatus">大まかな処理の流れ (<code>ProgressStatus</code>)</a></li>
+<li><a href="#%E5%88%9D%E6%9C%9F%E5%8C%96%E5%87%A6%E7%90%86-progressstatusinitializing--initializingstatus">初期化処理 (<code>ProgressStatus.INITIALIZING</code> / <code>InitializingStatus</code>)</a></li>
+<li><a href="#%E5%9F%BA%E6%9C%AC%E6%83%85%E5%A0%B1%E3%81%AE%E5%8F%96%E5%BE%97%E4%BF%9D%E5%AD%98%E5%87%A6%E7%90%86-progressstatusbasic_data--getbasicdatastatus">基本情報の取得・保存処理 (<code>ProgressStatus.BASIC_DATA</code> / <code>GetBasicDataStatus</code>)</a></li>
+<li><a href="#%E7%94%B3%E8%AB%8B%E6%9B%B8%E3%81%AE%E6%A6%82%E8%A6%81%E3%81%AE%E5%8F%96%E5%BE%97%E4%BF%9D%E5%AD%98%E5%87%A6%E7%90%86-progressstatusform_outline--getformoutlinestatus">申請書の概要の取得・保存処理 (<code>ProgressStatus.FORM_OUTLINE</code> / <code>GetFormOutlineStatus</code>)</a></li>
+<li><a href="#%E7%94%B3%E8%AB%8B%E6%9B%B8%E8%A9%B3%E7%B4%B0%E3%81%AE%E5%8F%96%E5%BE%97%E4%BF%9D%E5%AD%98%E5%87%A6%E7%90%86-progressstatusform_detail--getformdetailstatus">申請書詳細の取得・保存処理 (<code>ProgressStatus.FORM_DETAIL</code> / <code>GetFormDetailStatus</code>)</a></li>
+<li><a href="#%E7%B5%82%E4%BA%86%E5%87%A6%E7%90%86-progressstatusterminating">終了処理 (<code>ProgressStatus.TERMINATING</code>)</a></li>
+</ul>
+</li>
+<li><a href="#%E8%A9%B3%E7%B4%B0%E9%96%8B%E7%99%BA%E8%80%85%E5%90%91%E3%81%91">詳細（開発者向け）</a>
+<ul>
+<li><a href="#%E5%85%A8%E4%BD%93%E3%81%AE%E6%B5%81%E3%82%8C">全体の流れ</a></li>
+<li><a href="#%E7%94%B3%E8%AB%8B%E6%9B%B8%E6%83%85%E5%A0%B1%E3%81%AE%E5%8F%96%E5%BE%97%E5%87%A6%E7%90%86">申請書情報の取得処理</a></li>
+<li><a href="#%E4%BE%8B%E5%A4%96%E5%87%A6%E7%90%86">例外処理</a></li>
+</ul>
+</li>
+</ul>
+<h2 id="メイン">メイン </h2>
+<p>本アプリケーションのメインの処理は「APIを介してデータをローカルに取得すること」と「取得したデータを加工してデータベースに保存すること」です。メイン処理の進捗状況は<code>jobcan_di/integrator/progress_status.py</code>の各<code>Enum</code>クラスにより定義・管理しています。</p>
+<h3 id="大まかな処理の流れ-progressstatus">大まかな処理の流れ (<code>ProgressStatus</code>) </h3>
+<p>本アプリケーションのメインの処理の進捗状況は、大きく分けて以下の５つのステータスに分類されます。実際には、これらに加えて<code>FAILED</code>ステータスも存在しますが、以下では説明を省略します。</p>
+<p><strong>表</strong> 大まかな処理の流れ、ステータス列の各値は<code>ProgressStatus</code>クラスのメンバ名です。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">順番</th>
+<th>ステータス</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">1</td>
+<td><code>INITIALIZING</code></td>
+<td>設定ファイルの読み込みやデータベースの初期化など、アプリケーションの初期化処理を行っている際のステータスです。</td>
+</tr>
+<tr>
+<td style="text-align:center">2</td>
+<td><code>BASIC_DATA</code></td>
+<td>ユーザー情報やグループ情報など、申請書関連の情報を除いた基本的な情報を取得している際のステータスです。</td>
+</tr>
+<tr>
+<td style="text-align:center">3</td>
+<td><code>FORM_OUTLINE</code></td>
+<td>申請書の概要（申請書の種類が何種類存在するかや、それぞれの種類の名前など）を取得している際のステータスです。</td>
+</tr>
+<tr>
+<td style="text-align:center">4</td>
+<td><code>FORM_DETAIL</code></td>
+<td>申請書の詳細（各申請書の詳細な情報）を取得している際のステータスです。</td>
+</tr>
+<tr>
+<td style="text-align:center">5</td>
+<td><code>TERMINATING</code></td>
+<td>メインの処理が完了した後の終了処理を行っている際のステータスです。</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>実際には、<code>FORM_OUTLINE</code>と<code>FORM_DETAIL</code>で取得しているデータは以下のようになっています。このため、<code>FORM_OUTLINE</code>と<code>FORM_DETAIL</code>という名称は実際の処理内容に忠実とは言えないのですが、<code>REQUESTS</code>という名称を使用するとややこしいため上記の名称を使用しています。</p>
+<ul>
+<li><code>FORM_OUTLINE</code>
+<ul>
+<li><code>/v1/forms/</code>API: 申請書の種類が何種類存在するかや、それぞれの種類の名前など</li>
+<li><code>/v2/requests/</code>API: 各申請書のデータ抜粋（申請者、申請日時、タイトルなど）</li>
+</ul>
+</li>
+<li><code>FORM_DETAIL</code>
+<ul>
+<li><code>/v1/request/{request_id}/</code>API: 各申請書の詳細な情報</li>
+</ul>
+</li>
+</ul>
+</blockquote>
+<h3 id="初期化処理-progressstatusinitializing--initializingstatus">初期化処理 (<code>ProgressStatus.INITIALIZING</code> / <code>InitializingStatus</code>) </h3>
+<p><code>ProgressStatus.INITIALIZING</code>ステータスでは、アプリケーションの初期化処理を行っています。具体的には、以下の処理を行っています。</p>
+<p><strong>表</strong> 初期化処理の流れ、ステータス列の各値は<code>InitializingStatus</code>クラスのメンバ名です。また、「🛑」マークは、そのステータスでの処理が失敗した場合に以降の処理が行われないことを示しています。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">順番</th>
+<th>ステータス</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">1</td>
+<td><code>LOADING_CONFIG</code></td>
+<td>設定ファイルと、前回終了時のアプリケーションステータスを読み込みます。</td>
+</tr>
+<tr>
+<td style="text-align:center">2</td>
+<td><code>INIT_LOGGER</code></td>
+<td>ロガーを初期化します。</td>
+</tr>
+<tr>
+<td style="text-align:center">3</td>
+<td><code>INIT_NOTIFICATION</code></td>
+<td>通知機能（トースト通知）を初期化します。</td>
+</tr>
+<tr>
+<td style="text-align:center">4</td>
+<td><code>INIT_DIRECTORIES</code></td>
+<td>本アプリケーションで使用するフォルダを初期化します。<br>設定ファイルやログファイルを格納するためのフォルダに関しては、これ以前の処理で作成されます。</td>
+</tr>
+<tr>
+<td style="text-align:center">5</td>
+<td>🛑<code>INIT_TOKEN</code></td>
+<td>ジョブカンのAPIを利用するためのトークンが正しく設定されているかを確認します。<br>設定されたトークンが正しくない場合、アプリケーションは終了します。</td>
+</tr>
+<tr>
+<td style="text-align:center">6</td>
+<td>🛑<code>INIT_DB_CONNECTION</code></td>
+<td>データベースへの接続を初期化します。<br>接続に失敗した場合、アプリケーションは終了します。</td>
+</tr>
+<tr>
+<td style="text-align:center">7</td>
+<td><code>INIT_DB_TABLES</code></td>
+<td>データベースのテーブルを初期化します。</td>
+</tr>
+<tr>
+<td style="text-align:center">8</td>
+<td><code>COMPLETED</code></td>
+<td>初期化処理終了</td>
+</tr>
+</tbody>
+</table>
+<h3 id="基本情報の取得保存処理-progressstatusbasic_data--getbasicdatastatus">基本情報の取得・保存処理 (<code>ProgressStatus.BASIC_DATA</code> / <code>GetBasicDataStatus</code>) </h3>
+<p><code>ProgressStatus.BASIC_DATA</code>ステータスでは、ユーザー情報やグループ情報など、申請書関連の情報を除いた基本的な情報を取得しています。具体的には、以下の処理を行っています。</p>
+<p><strong>表</strong> 基本情報の取得・保存処理の流れ、ステータス列の各値は<code>GetBasicDataStatus</code>クラスのメンバ名です。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">順番</th>
+<th>ステータス</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">1</td>
+<td><code>GET_USER</code></td>
+<td>ユーザー情報を取得・保存します。</td>
+</tr>
+<tr>
+<td style="text-align:center">2</td>
+<td><code>GET_GROUP</code></td>
+<td>グループ情報を取得・保存します。</td>
+</tr>
+<tr>
+<td style="text-align:center">3</td>
+<td><code>GET_POSITION</code></td>
+<td>役職情報を取得・保存します。</td>
+</tr>
+</tbody>
+</table>
+<h3 id="申請書の概要の取得保存処理-progressstatusform_outline--getformoutlinestatus">申請書の概要の取得・保存処理 (<code>ProgressStatus.FORM_OUTLINE</code> / <code>GetFormOutlineStatus</code>) </h3>
+<p><code>ProgressStatus.FORM_OUTLINE</code>ステータスでは、申請書の概要（申請書の種類が何種類存在するかや、それぞれの種類の名前など）を取得しています。具体的には、以下の処理を行っています。</p>
+<p><strong>表</strong> 申請書の概要の取得・保存処理の流れ、ステータス列の各値は<code>GetFormOutlineStatus</code>クラスのメンバ名です。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">順番</th>
+<th>ステータス</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">1</td>
+<td><code>GET_FORM_INFO</code></td>
+<td>フォームデータ（申請書が何種類存在するかや、それぞれの種類の名前など）を取得・保存します。</td>
+</tr>
+<tr>
+<td style="text-align:center">2</td>
+<td><code>GET_OUTLINE</code></td>
+<td>各申請書の基本情報（申請者、申請日時、タイトルなど）を取得・保存します。保存先は一時ファイルです。</td>
+</tr>
+</tbody>
+</table>
+<h3 id="申請書詳細の取得保存処理-progressstatusform_detail--getformdetailstatus">申請書詳細の取得・保存処理 (<code>ProgressStatus.FORM_DETAIL</code> / <code>GetFormDetailStatus</code>) </h3>
+<p><code>ProgressStatus.FORM_DETAIL</code>ステータスでは、申請書の詳細（各申請書の詳細な情報）を取得しています。具体的には、以下の処理を行っています。</p>
+<p><strong>表</strong> 申請書詳細の取得・保存処理の流れ、ステータス列の各値は<code>GetFormDetailStatus</code>クラスのメンバ名です</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">順番</th>
+<th>ステータス</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">1</td>
+<td><code>SEEK_TARGET</code></td>
+<td>一時ファイルに保存された申請書IDと、前回取得時点で完了/キャンセルされていない申請書のIDを取得します。</td>
+</tr>
+<tr>
+<td style="text-align:center">2</td>
+<td><code>GET_DETAIL</code></td>
+<td>取得した申請書IDに基づき、各申請書を取得・保存します。</td>
+</tr>
+</tbody>
+</table>
+<h3 id="終了処理-progressstatusterminating">終了処理 (<code>ProgressStatus.TERMINATING</code>) </h3>
+<p><code>ProgressStatus.TERMINATING</code>ステータスでは、メインの処理が完了した後の終了処理を行っています。具体的には、以下の処理を行っています。</p>
+<p><strong>表</strong> 終了処理の流れ、ステータス列の各値は<code>TerminatingStatus</code>クラスのメンバ名です。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">順番</th>
+<th>ステータス</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">1</td>
+<td><code>CLOSE_DB_CONNECTION</code></td>
+<td>データベースへの接続を閉じます。</td>
+</tr>
+<tr>
+<td style="text-align:center">2</td>
+<td><code>DELETE_TEMP_FILES</code></td>
+<td>一時ファイルを削除します。</td>
+</tr>
+<tr>
+<td style="text-align:center">3</td>
+<td><code>COMPLETED</code></td>
+<td>アプリケーションの処理が完了しました。</td>
+</tr>
+</tbody>
+</table>
+<h2 id="詳細開発者向け">詳細（開発者向け） </h2>
+<h3 id="全体の流れ">全体の流れ </h3>
+<h3 id="申請書情報の取得処理">申請書情報の取得処理 </h3>
+<p>ジョブカンのAPIでは、申請書に関する情報は以下の３つのAPIからそれぞれ取得することになります。</p>
+<table>
+<thead>
+<tr>
+<th>API</th>
+<th>対象</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/v1/forms/</code></td>
+<td><code>form_id</code></td>
+<td>申請書の種類が何種類存在するかや、それぞれの種類の名前など。<br>データの量はあまり多くないと考えられるため、基本的には毎回全件取得することになります。</td>
+</tr>
+<tr>
+<td><code>/v2/requests/</code></td>
+<td><code>request_id</code></td>
+<td>各申請書のデータ抜粋（申請者、申請日時、タイトルなど）。<br>各 <code>form_id</code> に対応する <code>request_id</code> を、基本的には前回取得以降の新規登録分のみ取得することになります。</td>
+</tr>
+<tr>
+<td><code>/v1/request/{request_id}/</code></td>
+<td>-</td>
+<td>各申請書の詳細な情報。<br>各 <code>request_id</code> に対応する詳細情報を取得します。上で取得した <code>request_id</code> に加え、データベースの <code>requests</code> テーブルでの更新状態が <code>in_progress</code> であるものを取得することになります。</td>
+</tr>
+</tbody>
+</table>
+<p>したがって、具体的な申請書を取得するためには、</p>
+<ol>
+<li><code>/v1/forms/</code> APIで申請書の種類を取得</li>
+<li><code>/v2/requests/</code> APIで <code>form_id</code> に対応する <code>request_id</code> を取得</li>
+<li><code>/v1/request/{request_id}/</code> APIで各申請書の詳細を取得</li>
+</ol>
+<p>という手順を踏むことになります。</p>
+<p>エラー処理を併せて考えると、以下のような処理の流れになります。</p>
+<ol>
+<li><code>/v1/forms/</code> APIで申請書の種類を取得
+<ol>
+<li>毎回全件取得するため、取得できた分だけをDBに保存します。</li>
+</ol>
+</li>
+<li><code>/v2/requests/</code> APIで <code>form_id</code> に対応する <code>request_id</code> を取得
+<ol>
+<li>以下の条件に従い、取得対象となる <code>form_id</code> をリストアップします。
+<ol>
+<li>DBの <code>forms</code> テーブルに存在する <code>form_id</code> のうち、処理済みではないもの (<code>JobcanDataIntegrator.config.app_status.progress</code> の <code>.specifics</code> に存在しないもの)</li>
+<li>app_statusの <code>"fetch_failure_record"</code> → <code>"basic_data"</code> → <code>"REQUEST_OUTLINE"</code> に保存された <code>form_id</code></li>
+</ol>
+</li>
+<li>リストアップされた各 <code>form_id</code> ごとに、以下の処理を行います。
+<ol>
+<li><code>form_id</code> に対応する、APIへの最終アクセス日時を取得します。</li>
+<li>APIアクセス直前の最終アクセス日時を取得します (→ <code>last_access</code>)。</li>
+<li>この日時以降の新規登録分を取得します。
+<ol>
+<li>取得に失敗した場合、app_statusの <code>"fetch_failure_record"</code> → <code>"basic_data"</code> → <code>"REQUEST_OUTLINE"</code> に <code>form_id</code> を追加します。</li>
+</ol>
+</li>
+<li>取得した <code>request_id</code> を一時ファイルに保存します。</li>
+</ol>
+</li>
+</ol>
+</li>
+<li><code>/v1/request/{request_id}/</code> APIで各申請書の詳細を取得
+<ol>
+<li>各 <code>form_id</code> ごとに、以下の処理を行います。
+<ol>
+<li>取得対象となる <code>request_id</code> をリストアップします。
+<ol>
+<li>一時ファイルに保存された <code>request_id</code></li>
+<li>DBの <code>requests</code> テーブルでの更新状態が <code>in_progress</code> であるもの</li>
+<li>app_statusの <code>"fetch_failure_record"</code> → <code>"request_detail"</code> に保存された <code>request_id</code></li>
+</ol>
+</li>
+<li>取得した <code>request_id</code> の詳細情報を取得します。
+<ol>
+<li>取得に失敗した場合、app_statusの <code>"fetch_failure_record"</code> → <code>"request_detail"</code> に <code>request_id</code> を追加します。</li>
+</ol>
+</li>
+<li>取得した情報をDBに保存します。</li>
+<li>取得が完了したら、一時ファイルから削除します。</li>
+</ol>
+</li>
+<li>各 <code>form_id</code> に対応する全 <code>request_id</code> (上の 3.1.1 で取得したもの) の処理が終了したら、app_statusの最終アクセス日時を <code>last_access</code> に更新します。</li>
+</ol>
+</li>
+<li>以上の処理を終了後、一時ファイルに保存されたデータがなければ一時ファイルを削除します。プログラムに瑕疵がなければ、一時ファイルは毎回削除されることになります。ただし、途中で処理が中断された場合には一時ファイルは残存し、再開時にそのデータを使用します。</li>
+</ol>
+<blockquote>
+<p>2.2.3 申請書概要の取得 / 3.1.1.2 : 処理中の申請書</p>
+<p>APIの公式ドキュメントによると、この<code>status</code>の値は以下の6通りとのことです（24/08/20時点）。</p>
+<ul>
+<li><code>in_progress</code>: 進行中</li>
+<li><code>completed</code>: 完了</li>
+<li><code>rejected</code>: 却下</li>
+<li><code>canceled</code>: 取り消し</li>
+<li><code>returned</code>: 差し戻し</li>
+<li><code>canceled_after_completion</code>: 完了後取り消し</li>
+</ul>
+<p>このため、3.1.1.2では<code>completed</code>、<code>rejected</code>、<code>canceled</code>、<code>canceled_after_completion</code>以外の要素を取得することになります（要は<code>in_progress</code>と<code>returned</code>を取得するということですが、後々<code>status</code>が増える可能性を排除しきれないため除外式の方が正確かと思います）。</p>
+<p>一方、2.2.3で申請書IDを取得する際に、3.1.1.2からは取得できないため、<code>&amp;completed_after=lastAccess&amp;status=canceled_after_completion</code>である要素を取得する必要があります。</p>
+</blockquote>
+<h3 id="例外処理">例外処理 </h3>
+<p>本アプリケーションでは、進行不可能なエラー (<code>JDIErrorData</code>)と、進行可能なエラー (<code>JDIWarningData</code>) を区別して扱っています。進行不可能なエラーが発生した場合、アプリケーションは終了します。進行可能なエラーが発生した場合、アプリケーションは継続しますが、エラー内容はログに記録されます。</p>
+<p>基本的には、<code>JDIWarningData</code>が発生した場合は直後に<code>._update_progress</code>メソッドによる更新処理を行います。一方で、<code>JDIErrorData</code>が発生した場合には、<code>._update_progress</code>メソッドは呼び出さず、<code>.cancel</code>メソッドによる終了処理を行います。また、<code>.cancel</code>メソッドを呼び出す階層は、極力<code>._run</code>メソッドの直下（まわり）、および<code>.run</code>メソッドに限定しています。</p>
+<hr>
+<blockquote>
+<p><a href="../README.html">全体の目次に戻る</a></p>
+</blockquote>
+
+      </div>
+      
+      
+    
+    
+    
+    
+    
+    
+  
+    </body></html>
