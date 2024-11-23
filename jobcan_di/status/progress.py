@@ -104,6 +104,9 @@ class GetBasicDataStatus(DetailedProgressStatus):
     GET_USER = 1
     GET_GROUP = auto()
     GET_POSITION = auto()
+    GET_PROJECT = auto()
+    GET_COMPANY = auto()
+    GET_FIX_JOURNAL = auto()
 
 # 進捗状況 (BASIC_DATA) メッセージ
 _cnt = len(GetBasicDataStatus)
@@ -111,6 +114,9 @@ GET_BASIC_DATA_STATUS_MSG = {
     GetBasicDataStatus.GET_USER: f"ユーザデータを取得中... (1/{_cnt})",
     GetBasicDataStatus.GET_GROUP: f"グループデータを取得中... (2/{_cnt})",
     GetBasicDataStatus.GET_POSITION: f"役職データを取得中... (3/{_cnt})",
+    GetBasicDataStatus.GET_PROJECT: f"プロジェクトデータを取得中... (4/{_cnt})",
+    GetBasicDataStatus.GET_COMPANY: f"取引先データを取得中... (5/{_cnt})",
+    GetBasicDataStatus.GET_FIX_JOURNAL: f"仕訳データを取得中... (6/{_cnt})"
 }
 
 class GetFormOutlineStatus(DetailedProgressStatus):
@@ -226,6 +232,9 @@ class APIType(Enum):
     USER_V3 = auto()
     GROUP_V1 = auto()
     POSITION_V1 = auto()
+    PROJECT_V1 = auto()
+    COMPANY_V1 = auto()
+    FIX_JOURNAL_V1 = auto()
     FORM_V1 = auto()
     REQUEST_OUTLINE = auto()
     REQUEST_DETAIL = auto()
@@ -234,7 +243,10 @@ API_TYPE_NAME = {
     APIType.USER_V3: "ユーザデータ",
     APIType.GROUP_V1: "グループデータ",
     APIType.POSITION_V1: "役職データ",
+    APIType.PROJECT_V1: "プロジェクトデータ",
     APIType.FORM_V1: "申請書様式データ",
+    APIType.COMPANY_V1: "取引先データ",
+    APIType.FIX_JOURNAL_V1: "仕訳データ",
     APIType.REQUEST_OUTLINE: "申請書データ (概要)",
     APIType.REQUEST_DETAIL: "申請書データ (詳細)",
 }
@@ -253,15 +265,10 @@ def get_progress_status(api_type:APIType) -> ProgressStatus:
     ProgressStatus
         進捗状況 (大枠)
     """
-    if api_type == APIType.USER_V3:
+    if api_type in {APIType.USER_V3, APIType.GROUP_V1, APIType.POSITION_V1,
+                    APIType.PROJECT_V1, APIType.COMPANY_V1, APIType.FIX_JOURNAL_V1}:
         return ProgressStatus.BASIC_DATA
-    elif api_type == APIType.GROUP_V1:
-        return ProgressStatus.BASIC_DATA
-    elif api_type == APIType.POSITION_V1:
-        return ProgressStatus.BASIC_DATA
-    elif api_type == APIType.FORM_V1:
-        return ProgressStatus.FORM_OUTLINE
-    elif api_type == APIType.REQUEST_OUTLINE:
+    elif api_type in {APIType.FORM_V1, APIType.REQUEST_OUTLINE}:
         return ProgressStatus.FORM_OUTLINE
     elif api_type == APIType.REQUEST_DETAIL:
         return ProgressStatus.FORM_DETAIL
@@ -288,6 +295,12 @@ def get_detailed_progress_status(api_type:APIType) -> Union[GetBasicDataStatus,
         return GetBasicDataStatus.GET_GROUP
     elif api_type == APIType.POSITION_V1:
         return GetBasicDataStatus.GET_POSITION
+    elif api_type == APIType.PROJECT_V1:
+        return GetBasicDataStatus.GET_PROJECT
+    elif api_type == APIType.COMPANY_V1:
+        return GetBasicDataStatus.GET_COMPANY
+    elif api_type == APIType.FIX_JOURNAL_V1:
+        return GetBasicDataStatus.GET_FIX_JOURNAL
     elif api_type == APIType.FORM_V1:
         return GetFormOutlineStatus.GET_FORM_INFO
     elif api_type == APIType.REQUEST_OUTLINE:

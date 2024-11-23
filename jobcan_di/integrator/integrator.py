@@ -133,6 +133,11 @@ class JobcanDataIntegrator:
             **self.config.app_status.progress.asdict()
         )
         """前回の進捗状況"""
+        self._previous_error = self.config.app_status.current_error
+        """前回の進捗状況にエラーがあるかどうか、ない場合はNone"""
+        # 前回の進捗状況を保存した後は現在のエラー状態を初期化する
+        self.config.app_status.remove_error()
+
         self._issued_warnings: list[iw.JDIWarningData] = []
         """実行中に発生した警告のログ"""
 
@@ -292,7 +297,7 @@ class JobcanDataIntegrator:
 
     def _init_tables(self) -> Optional[ie.JDIErrorData]:
         """テーブルの初期化"""
-        if (err := self._gateway.init_tables()):
+        if (err := self._gateway.init_tables(views=self.config.table_views)):
             return err
 
         # 進捗状況の更新
@@ -421,6 +426,10 @@ class JobcanDataIntegrator:
         if self.is_canceled or self.config.app_status.has_error:
             # キャンセルされた場合、または現在エラー発生中であればFalse
             return False
+
+        # 前回の進捗状況がエラーの場合はTrue
+        if self._previous_error is not None:
+            return True
 
         # 前回の進捗状況がapi_typeよりも未来のものの場合はFalse
         return self._previous_progress.is_future_process(api_type)

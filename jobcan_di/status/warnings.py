@@ -536,10 +536,11 @@ class DBUpdateFailed(JDIWarningData):
         self._details["api_type"] = api_type if isinstance(api_type, str) else api_type.name
 
     def warning_message(self) -> str:
+        api_type = APIType[self._details["api_type"]]
         if self.exception_name:
-            return f"{API_TYPE_NAME[self._details['api_type']]} のデータ更新に失敗しました。" \
+            return f"{API_TYPE_NAME[api_type]} のデータ更新に失敗しました。" \
                    f"例外: {self.exception_name} - {self.args}"
-        return f"{API_TYPE_NAME[self._details['api_type']]} のデータ更新に失敗しました。"
+        return f"{API_TYPE_NAME[api_type]} のデータ更新に失敗しました。"
 
 
 #

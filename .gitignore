@@ -11,6 +11,7 @@ experiments/
 *.csv
 *.json
 app_status
+app_status_
 
 # Build (nuitka)
 *.build/

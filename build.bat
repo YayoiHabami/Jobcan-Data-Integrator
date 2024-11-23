@@ -1,0 +1,1 @@
+nuitka --standalone --windows-icon-from-ico="jobcan_di\config\resources\icons\icon.ico" --windows-console-mode=disable --follow-imports --nofollow-import-to=pytest app.py
