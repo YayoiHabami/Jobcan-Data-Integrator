@@ -25,6 +25,9 @@ DEFAULT_API_SUFFIX: Dict[APIType, str] = {
     APIType.USER_V3: "/v3/users/",
     APIType.GROUP_V1: "/v1/groups/",
     APIType.POSITION_V1: "/v1/positions/",
+    APIType.PROJECT_V1: "/v1/projects/",
+    APIType.COMPANY_V1: "/v1/company/",
+    APIType.FIX_JOURNAL_V1: "/v1/fix_journals/unprinted/",
     APIType.FORM_V1: "/v1/forms/",
     APIType.REQUEST_OUTLINE: "/v2/requests/",
     APIType.REQUEST_DETAIL: "/v1/requests/"
@@ -390,7 +393,8 @@ class JobcanApiClient:
             api_type:APIType,
             *,
             issue_callback:Optional[Callable[[Union[ie.JDIErrorData, iw.JDIWarningData]],
-                                             None]] = None
+                                             None]] = None,
+            timeout:int = 30
         ) -> ApiResponse:
         """APIを使用してデータを取得する
 
@@ -402,6 +406,8 @@ class JobcanApiClient:
             取得するデータの種類
         issue_callback : func(Union[ie.JDIErrorData, iw.JDIWarningData]) -> None, optional
             エラー/警告が発生した場合に呼び出されるコールバック関数
+        timeout : int, default 30
+            タイムアウト時間（秒）
 
         Returns
         -------
@@ -416,7 +422,7 @@ class JobcanApiClient:
             return ApiResponse(error=ie.ApiClientNotPrepared(json.dumps(msg, ensure_ascii=False)))
 
         try:
-            res = self._requests.get(url, headers=self._headers)
+            res = self._requests.get(url, timeout=timeout, headers=self._headers)
             try:
                 j_res = res.json()
             except json.JSONDecodeError:
@@ -449,7 +455,9 @@ class JobcanApiClient:
     def fetch_basic_data(
             self,
             api_type: Literal[APIType.USER_V3, APIType.GROUP_V1,
-                              APIType.POSITION_V1, APIType.FORM_V1,
+                              APIType.POSITION_V1, APIType.PROJECT_V1,
+                              APIType.COMPANY_V1, APIType.FIX_JOURNAL_V1,
+                              APIType.FORM_V1,
                               APIType.REQUEST_OUTLINE],
             query: str = "",
             return_on_error: bool = False,
@@ -483,7 +491,7 @@ class JobcanApiClient:
 
         result = ApiResponse()
         while True:
-            res = self._fetch_data(url, api_type, issue_callback=issue_callback)
+            res = self._fetch_data(url, api_type, issue_callback=issue_callback, timeout=180)
             if isinstance(res.error, iw.JDIWarningData):
                 # 正常なレスポンスが帰ってこなかった場合
                 result.error = res.error

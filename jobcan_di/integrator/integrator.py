@@ -523,7 +523,9 @@ class JobcanDataIntegrator:
             self.cancel(ie.NotInitializedError())
 
         # 基本データの取得
-        for api_type in [APIType.USER_V3, APIType.GROUP_V1, APIType.POSITION_V1, APIType.FORM_V1]:
+        for api_type in [APIType.USER_V3, APIType.GROUP_V1, APIType.POSITION_V1,
+                         APIType.PROJECT_V1, APIType.COMPANY_V1,
+                         APIType.FIX_JOURNAL_V1, APIType.FORM_V1]:
             if (err:=self._update_basic_data(api_type)):
                 return self.cancel(err)
 
@@ -655,8 +657,9 @@ class JobcanDataIntegrator:
 
     def _update_basic_data(
             self,
-            api_type: Literal[APIType.USER_V3, APIType.GROUP_V1,
-                              APIType.POSITION_V1, APIType.FORM_V1]
+            api_type: Literal[APIType.USER_V3, APIType.GROUP_V1, APIType.POSITION_V1,
+                              APIType.PROJECT_V1, APIType.COMPANY_V1,
+                              APIType.FIX_JOURNAL_V1, APIType.FORM_V1]
     ) -> Optional[ie.JDIErrorData]:
         """基本データの取得＆更新
 

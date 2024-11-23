@@ -80,6 +80,13 @@ class JobcanDIConfig:
 
         _c = ConfigEditor(self.config_file, encoding='utf-8')
 
+        create_views_file = path.join(self.settings_dir, 'create_views.sql')
+        self.table_views:str = ""
+        """データベースのビューの定義"""
+        if path.exists(create_views_file):
+            with open(create_views_file, "r", encoding='utf-8') as f:
+                self.table_views = f.read()
+
         self.api_token_env = _c['API']['TOKEN_ENV_NAME'].value
         """APIのトークン取得先（環境変数名）"""
         self.api_token = _c['API']['API_TOKEN'].value

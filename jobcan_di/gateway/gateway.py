@@ -16,6 +16,9 @@ from jobcan_di.database import (
     forms as f_io,
     group as g_io,
     positions as p_io,
+    project as pj_io,
+    company as c_io,
+    fix_journal as j_io,
     requests as r_io,
     users as u_io
 )
@@ -97,9 +100,14 @@ class JobcanApiGateway:
         except sqlite3.Error as e:
             return ie.DatabaseConnectionFailed(e)
 
-    def init_tables(self) -> Optional[ie.JDIErrorData]:
+    def init_tables(self, views:str="") -> Optional[ie.JDIErrorData]:
         """
         データベースのテーブルを初期化する
+
+        Parameters
+        ----------
+        views : str, optional
+            ビューの定義、指定された場合はビューを作成する
         """
         if self._conn is None:
             return ie.DatabaseConnectionNotPrepared()
@@ -108,8 +116,14 @@ class JobcanApiGateway:
             u_io.create_tables(self._conn)
             p_io.create_tables(self._conn)
             g_io.create_tables(self._conn)
+            pj_io.create_tables(self._conn)
+            c_io.create_tables(self._conn)
+            j_io.create_tables(self._conn)
             f_io.create_tables(self._conn)
             r_io.create_tables(self._conn)
+
+            if views:
+                self._conn.executescript(views)
         except sqlite3.Error as e:
             return ie.DatabaseTableCreationFailed(e)
 
@@ -230,7 +244,8 @@ class JobcanApiGateway:
 
     def _update_func(self,
                      api_type:Literal[APIType.USER_V3, APIType.GROUP_V1, APIType.POSITION_V1,
-                                      APIType.FORM_V1]
+                                      APIType.PROJECT_V1, APIType.COMPANY_V1,
+                                      APIType.FIX_JOURNAL_V1, APIType.FORM_V1]
         ) -> Callable[[sqlite3.Connection, dict], None]:
         """更新処理を返す関数を返す
 
@@ -250,13 +265,20 @@ class JobcanApiGateway:
             return g_io.update
         elif api_type == APIType.POSITION_V1:
             return p_io.update
+        elif api_type == APIType.PROJECT_V1:
+            return pj_io.update
+        elif api_type == APIType.COMPANY_V1:
+            return c_io.update
+        elif api_type == APIType.FIX_JOURNAL_V1:
+            return j_io.update
         elif api_type == APIType.FORM_V1:
             return f_io.update
 
     def update_basic_data(
             self,
             api_type: Literal[APIType.USER_V3, APIType.GROUP_V1, APIType.POSITION_V1,
-                              APIType.FORM_V1],
+                              APIType.PROJECT_V1, APIType.COMPANY_V1,
+                              APIType.FIX_JOURNAL_V1, APIType.FORM_V1],
             *,
             issue_callback: Optional[Callable[[Union[ie.JDIErrorData,
                                                      iw.JDIWarningData]], None]]=None,

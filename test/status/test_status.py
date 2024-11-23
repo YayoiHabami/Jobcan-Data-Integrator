@@ -228,36 +228,30 @@ def test_fetch_failure_record_errors():
 def failure_record_prev():
     """古い方のFetchFailureRecordのインスタンスを返すfixture"""
     fr = {
-        "basic_data": {
-            "USER_V3": {"1", "2", "3"},
-            "GROUP_V1": {"1", "2", "3"},
-            "POSITION_V1": {"1", "2", "3"},
-            "FORM_V1": {"1", "2", "3"},
-            "REQUEST_OUTLINE": {"1", "2", "3"},
-        },
+        "basic_data": dict(),
         "request_detail": {
             "789": {"1", "2", "3"},
             "123": {"1", "2", "3"},
         }
     }
+    for api in APIType:
+        if api is not APIType.REQUEST_DETAIL:
+            fr["basic_data"][api.name] = {str(i) for i in range(1, 4)}
     return FailureRecord(**fr)
 
 @pytest.fixture
 def failure_record_new():
     """新しい方のFetchFailureRecordのインスタンスを返すfixture"""
     fr = {
-        "basic_data": {
-            "USER_V3": {"1", "3", "5"},
-            "GROUP_V1": {"1", "3", "5"},
-            "POSITION_V1": {"1", "3", "5"},
-            "FORM_V1": {"1", "3", "5"},
-            "REQUEST_OUTLINE": {"1", "3", "5"},
-        },
+        "basic_data": dict(),
         "request_detail": {
             "789": {"1", "3", "5"},
             "123": {"1", "3", "5"},
         }
     }
+    for api in APIType:
+        if api is not APIType.REQUEST_DETAIL:
+            fr["basic_data"][api.name] = {str(i) for i in range(1, 6) if i % 2 == 1}
     return FailureRecord(**fr)
 
 @pytest.mark.parametrize("api_type", [
