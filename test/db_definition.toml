@@ -1,0 +1,146 @@
+# データ入力を行うテーブル : 以下を設定
+# - type : データベースの種類 (SQLite, MySQL, etc.)
+# - tables : 作成するテーブルを定義するSQL文 (CREATE TABLE; 念のため IF NOT EXISTS を推奨) のリスト
+[table_definitions]
+# SQLiteの場合 : 以下を追加
+# - path : データベースファイルのパス
+type = "SQLite"
+path = "path/to/db/db.sqlite"
+tables = [
+"""
+CREATE TABLE IF NOT EXISTS users (
+    user_code TEXT PRIMARY KEY,
+    email TEXT UNIQUE,
+    last_name TEXT NOT NULL,
+    first_name TEXT NOT NULL,
+    is_approver INTEGER NOT NULL DEFAULT 0
+);
+""",
+"""
+CREATE TABLE IF NOT EXISTS user_positions (
+    user_code TEXT NOT NULL,
+    position_code TEXT NOT NULL,
+    group_code TEXT,
+    UNIQUE(user_code, position_code)
+);
+"""
+]
+
+[data_link]
+# データソース (全般) : 以下を設定
+# - name : 一つのtoml内で固有、以降のdata_link.destinations等で使用
+# - type : データソースの種類 (API, SQLite, etc.)
+# - result_format : データ取得結果の形式
+#   - "DB-flat-rows" : `list[tuple[Any, ...]]`型
+#     - 例: `[('1-1', '1-2', ...), ('2-1', '2-2', ...), ...]`
+#     - DB: `SELECT *` や `SELECT key1, key2, ...` などで取得されるケース
+#   - "json-object-results" : `list[tuple[dict[str, Any]]]`型
+#     - 例: `[(dict(key1='1-1', key2='1-2',), ...]`
+#     - DB: `SELECT json_object(key1, key2, ...) FROM ...` などで取得されるケース。各tupleは1つのJSONオブジェクトのみを含む
+#   - "nested-json" : `dict[str, Any]`型
+#     - 例: `{'results': [dict(key1='1-1', key2='1-2', ...), ...], 'other_key': ...}`
+#     - API: 複数のデータが単一のJSONとして取得されるケース。データのリストに対応するキー名は`results_key`で指定
+#   - "multiple-json-entries" : `list[dict[str, Any]]`型
+#     - 例: `[dict(key1='1-1', key2='1-2', ...), ...]`
+#     - API: 一回のリクエストごとに一つのJSONが取得できるケース。全リクエストの結果をリストに格納 (`v1/requests`APIなど)
+# - results_key : データリストに対応するキー名、デフォルトは`"results"`
+#                 "nested-json"の場合のみ要求され、指定されない場合はデフォルト値が使用される
+[[data_link.sources]]
+# データソース (API経由の場合; GETのみ) : 以下を追加
+# - endpoint : APIのベースURL
+# - headers : リクエストヘッダー、指定しない場合はデフォルトのヘッダーが使用される
+#             指定する場合は辞書型で指定、デフォルトのヘッダーとマージされる
+#             (例: `{"Authorization" = "Bearer xxxxxxxx"}`)
+# - params : リクエストパラメーター
+name = "user_api"
+type = "API"
+result_format = "nested-json"
+endpoint = "https://ssl.wf.jobcan.jp/wf_api/v1/users/"
+
+[[data_link.sources]]
+# データソース (SQLiteからの場合) : 以下を追加
+# - path : DBのファイルパス
+# - query : データ取得用のクエリ
+name = "user_db"
+type = "SQLite"
+result_format = "json-object-results"
+path = "path/to/db/db.sqlite"
+query = """
+SELECT json_object(
+  'user_code', user_code,
+  'email', email,
+  'last_name', last_name,
+  'first_name', first_name,
+  'is_approver', json(CASE is_approver WHEN 0 THEN 'false' ELSE 'true' END),
+  'user_positions', (
+    SELECT json_group_array(
+      json_object(
+        'position_code', position_code,
+        'group_code', group_code
+      )
+    ) FROM user_positions WHERE user_code = users.user_code
+  )
+) FROM users;
+"""
+
+# DBへの格納方法 : 以下を設定
+# - query : データ格納用のSQL文
+#           プレースホルダーは `?` (positional) または `:param_name` (named) で指定
+#           どちらか一方のみ使用可能
+# - source : データ取得元を指定;
+#            `data_link.sources`で定義した名前のみを指定可能
+# - positional_parameters : プレースホルダーに対応するデータの取得方法を指定
+# - named_parameters : 名前付きプレースホルダーに対応するデータの取得方法を指定
+# - conversion_method : データ型の変換方法を指定（必要な場合）
+#                       `to-int`, `to-float`, `to-string`, `to-bool` のいずれかを指定
+[data_link.insertion_profile.users]
+# usersテーブルにデータを格納するためのSQL文
+query = """
+INSERT INTO users (
+  user_code, email, last_name, first_name, is_approver
+) VALUES (
+  :user_code, :email, :last_name, :first_name, :is_approver
+);
+"""
+# データの取得元を指定
+source = "user_db"
+# 名前付きプレースホルダー (positional_parametersとは併用不可)
+# プレースホルダー名と取得したデータのキーを指定
+# ⇒ 0,2,...番目 : プレースホルダー名
+# ⇒ 1,3,...番目 : 取得したデータのキー
+named_parameters = [
+    "user_code", ["user_code"],
+    "email", ["email"],
+    "last_name", ["last_name"],
+    "first_name", ["first_name"],
+    "is_approver", ["is_approver"]
+]
+# データ型の変換方法を指定（必要な場合）
+# ⇒ 0,2,...番目 : プレースホルダー名
+# ⇒ 1,3,...番目 : 変換方法
+conversion_method = [
+    "is_approver", "to-int"
+]
+
+[data_link.insertion_profile.user_positions]
+query = """
+INSERT INTO user_positions (
+  user_code, position_code, group_code
+) VALUES (
+  ?, ?, ?
+);
+"""
+source = "user_db"
+# 位置パラメータ (named_paramtersとは併用不可)
+# 位置パラメータに対応するデータの取得方法を指定
+positional_parameters = [
+    ["user_code"],
+    ["user_positions", -1, "position_code"],
+    ["user_positions", -1, "group_code"]
+]
+# データ型の変換方法を指定（必要な場合）
+# ⇒ 0,2,...番目 : positional_parametersの位置
+# ⇒ 1,3,...番目 : 変換方法
+conversion_method = [
+    0, "to-string"
+]

@@ -1,0 +1,135 @@
+# Define the data input table: set the following
+# - type: type of database (SQLite, MySQL, etc.)
+# - tables: list of SQL statements defining the tables to be created (CREATE TABLE; IF NOT EXISTS is recommended)
+[table_definitions]
+# For SQLite: add the following
+# - path: path to the database file
+type = "SQLite"
+path = "path/to/db/db.sqlite"
+tables = [
+"""
+CREATE TABLE IF NOT EXISTS users (
+    user_code TEXT PRIMARY KEY,
+    email TEXT UNIQUE,
+    last_name TEXT NOT NULL,
+    first_name TEXT NOT NULL,
+    is_approver INTEGER NOT NULL DEFAULT 0
+);
+""",
+"""
+CREATE TABLE IF NOT EXISTS user_positions (
+    user_code TEXT NOT NULL,
+    position_code TEXT NOT NULL,
+    group_code TEXT,
+    UNIQUE(user_code, position_code)
+);
+"""
+]
+
+[data_link]
+# Data source (general): set the following
+# - name: unique within a single toml, used in data_link.destinations, etc.
+# - type: type of data source (API, SQLite, etc.)
+# - result_type: format of the data retrieval result (json, csv, etc.)
+# - result_format: format of the data retrieval result, varies by type
+#   - API
+#     - multiple-results: if there are multiple data in the "result" key
+#     - single-result: if the retrieved data format is used as is (e.g. `v1/requests/{request_id}` API)
+#   - DB (SQLite)
+#     - single-element-tuple: if retrieved as a list of `(data,)` format
+[[data_link.sources]]
+# Data source (via API; GET only): add the following
+# - endpoint: base URL of the API
+# - headers: request headers, if not specified, the default headers are used
+#            if specified, it is specified as a dictionary and merged with the default headers
+#            (e.g. `{"Authorization" = "Bearer xxxxxxxx"}`)
+# - params: request parameters
+name = "user_api"
+type = "API"
+result_type = "json"
+result_format = "multiple-results"
+endpoint = "https://ssl.wf.jobcan.jp/wf_api/v1/users/"
+
+[[data_link.sources]]
+# Data source (from SQLite): add the following
+# - path: path to the DB file
+# - query: query for data retrieval
+name = "user_db"
+type = "SQLite"
+result_type = "json"
+result_format = "single-element-tuple"
+path = "path/to/db/db.sqlite"
+query = """
+SELECT json_object(
+  'user_code', user_code,
+  'email', email,
+  'last_name', last_name,
+  'first_name', first_name,
+  'is_approver', json(CASE is_approver WHEN 0 THEN 'false' ELSE 'true' END),
+  'user_positions', (
+    SELECT json_group_array(
+      json_object(
+        'position_code', position_code,
+        'group_code', group_code
+      )
+    ) FROM user_positions WHERE user_code = users.user_code
+  )
+) FROM users
+"""
+
+# Storage method in DB: set the following
+# - query: SQL statement for storing data
+#          specify placeholders with `?` (positional) or `:param_name` (named)
+#          only one of them can be used
+# - positional_parameters: specify how to retrieve data corresponding to placeholders
+# - named_parameters: specify how to retrieve data corresponding to named placeholders
+# - conversion_method: specify the method of converting data types if necessary
+#                      specify one of `to-int`, `to-float`, `to-string`, `to-bool`
+[data_link.insertion_profile.users]
+# SQL statement for storing data in the users table
+query = """
+INSERT INTO users (
+  user_code, email, last_name, first_name, is_approver
+) VALUES (
+  :user_code, :email, :last_name, :first_name, :is_approver
+);
+"""
+# Named placeholders (cannot be used with positional_parameters)
+# Specify the placeholder name and the key of the retrieved data
+# ⇒ 0,2,...th: placeholder name
+# ⇒ 1,3,...th: key of the retrieved data
+named_parameters = [
+    "user_code", ["user_api", "user_code"],
+    "email", ["user_api", "email"],
+    "last_name", ["user_api", "last_name"],
+    "first_name", ["user_api", "first_name"],
+    "is_approver", ["user_api", "is_approver"]
+]
+# Specify the method of converting data types if necessary
+# ⇒ 0,2,...th: placeholder name
+# ⇒ 1,3,...th: conversion method
+conversion_method = [
+    "is_approver", "to-int"
+]
+
+[data_link.insertion_profile.user_positions]
+query = """
+INSERT INTO user_positions (
+  user_code, position_code, group_code
+) VALUES (
+  ?, ?, ?
+);
+"""
+# Positional parameters (cannot be used with named_paramters)
+# Specify how to retrieve data corresponding to positional parameters
+positional_parameters = [
+    ["user_api", "user_code"],
+    ["user_api", "user_positions", -1, "position_code"],
+    ["user_api", "user_positions", -1, "group_code"]
+]
+# Specify the method of converting data types if necessary
+# ⇒ 0,2,...th: position of positional_parameters
+# ⇒ 1,3,...th: conversion method
+conversion_method = [
+    0, "to-string"
+]
