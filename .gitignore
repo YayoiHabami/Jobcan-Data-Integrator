@@ -13,6 +13,10 @@ experiments/
 app_status
 app_status_
 
+# Testing results
+test_db.sqlite
+test*.sqlite*
+
 # Build (nuitka)
 *.build/
 *.dist/

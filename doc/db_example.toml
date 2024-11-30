@@ -1,0 +1,119 @@
+[table_definitions]
+db_type = "SQLite"
+db_path = "C:/users/nggen/documents/test.db"
+tables = [
+"""
+CREATE TABLE IF NOT EXISTS users (
+    user_code TEXT PRIMARY KEY,
+    email TEXT UNIQUE,
+    last_name TEXT NOT NULL,
+    first_name TEXT NOT NULL,
+    is_approver INTEGER NOT NULL DEFAULT 0
+);
+""",
+"""
+CREATE TABLE IF NOT EXISTS user_positions (
+    user_code TEXT NOT NULL,
+    position_code TEXT NOT NULL,
+    group_code TEXT,
+    UNIQUE(user_code, position_code)
+)
+"""
+]
+
+[data_link]
+# データソース (全般) : 以下を設定
+# - name : 一つのtoml内で固有、以降のj2d等で使用
+# - type : データソースの種類 (API, SQLite, etc.)
+# - result : データ取得結果の形式 (json, csv, etc.)
+# - result_type : データ取得結果の形式、typeごとに異なる
+#   - API
+#     - multiple-results : `"result"`キー内に複数のデータがある場合
+#     - single-result : 取得したデータ形式をそのまま使用する場合 (`v1/requests/{request_id}`APIなど)
+#   - SQLite
+#     - single-element-tuple : `(data,)` の形式（のリスト）として取得される場合
+[[data_link.sources]]
+# データソース (API経由の場合) : 以下を追加
+# - base_url : APIのベースURL
+name = "user_api"
+type = "API"
+result = "json"
+result_type = "multiple-results"
+base_url = "https://ssl.wf.jobcan.jp/wf_api/v1/users/"
+
+[[data_link.sources]]
+# データソース (DBからの場合) : 以下を追加
+# - db_name : DBの名前 (SQLiteの場合はファイルパス)
+# - query : データ取得用のクエリ
+name = "user_db"
+type = "SQLite"
+result = "json"
+result_type = "single-element-tuple"
+db_name = "path/to/db.db"
+query = """
+SELECT json_object(
+  'user_code', user_code,
+  'email', email,
+  'last_name', last_name,
+  'first_name', first_name,
+  'is_approver', json(CASE is_approver WHEN 0 THEN 'false' ELSE 'true' END),
+  'user_positions', (
+    SELECT json_group_array(
+      json_object(
+        'position_code', position_code,
+        'group_code', group_code
+      )
+    ) FROM user_positions WHERE user_code = users.user_code
+  )
+) FROM users
+"""
+
+# DBへの格納方法を指定
+[data_link.destinations.users]
+# usersテーブルにデータを格納するためのSQL文
+query = """
+INSERT INTO users (
+  user_code, email, last_name, first_name, is_approver
+) VALUES (
+  :user_code, :email, :last_name, :first_name, :is_approver
+);
+"""
+# 名前付きプレースホルダー (positional_parametersとは併用不可)
+# プレースホルダー名と取得したデータのキーを指定
+# ⇒ 0,2,...番目 : プレースホルダー名
+# ⇒ 1,3,...番目 : 取得したデータのキー
+named_parameters = [
+    "user_code", ["user_api", "user_code"],
+    "email", ["user_api", "email"],
+    "last_name", ["user_api", "last_name"],
+    "first_name", ["user_api", "first_name"],
+    "is_approver", ["user_api", "is_approver"]
+]
+# データ型の変換方法を指定（必要な場合）
+# ⇒ 0,2,...番目 : プレースホルダー名
+# ⇒ 1,3,...番目 : 変換方法
+format = [
+    "is_approver", "to-int"
+]
+
+[data_link.destinations.user_positions]
+query = """
+INSERT INTO user_positions (
+  user_code, position_code, group_code
+) VALUES (
+  ?, ?, ?
+);
+"""
+# 位置パラメータ (named_paramtersとは併用不可)
+# 位置パラメータに対応するデータの取得方法を指定
+positional_parameters = [
+    ["user_api", "user_code"],
+    ["user_api", "user_positions", -1, "position_code"],
+    ["user_api", "user_positions", -1, "group_code"]
+]
+# データ型の変換方法を指定（必要な場合）
+# ⇒ 0,2,...番目 : positional_parametersの位置
+# ⇒ 1,3,...番目 : 変換方法
+format = [
+    0, "to-string"
+]
