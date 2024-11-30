@@ -1,3 +1,4 @@
+"""data_pipeline.parserモジュールのテストコード"""
 import pytest
 from tomlkit import exceptions as toml_exceptions
 

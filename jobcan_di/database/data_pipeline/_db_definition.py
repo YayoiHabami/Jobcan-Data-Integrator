@@ -126,5 +126,16 @@ class SQLiteDBDefinition(DBDefinition):
         """
         return self.authentication("path")
 
+    @path.setter
+    def path(self, path:str) -> None:
+        """Set the path to the SQLite database
+
+        Parameters
+        ----------
+        path : str
+            Path to the SQLite database
+        """
+        self._authentication["path"] = path
+
     def __repr__(self) -> str:
         return "SQLite" + super().__repr__()

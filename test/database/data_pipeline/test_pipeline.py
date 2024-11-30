@@ -1,11 +1,11 @@
-import os
+"""data_pipelineモジュールのテスト"""
 from os import path
 import sqlite3
 
 import pytest
 
 from jobcan_di.database.data_pipeline import (
-    PipelineDefinition
+    PipelineDefinition, SQLiteDBDefinition
 )
 from jobcan_di.database.data_pipeline.parser import parse_toml_data
 from jobcan_di.database.data_pipeline.pipeline import (
@@ -95,36 +95,51 @@ conversion_method = [
 ]
 '''
 
-def get_connection() -> sqlite3.Connection:
-    """SQLiteのConnectionオブジェクトを取得する
-    Returns
-    -------
-    sqlite3.Connection
-        Connection object
-    """
-    # 既に存在するDBファイルを削除
-    if path.exists(TEST_DB_PATH):
-        os.remove(TEST_DB_PATH)
 
-    conn = sqlite3.connect(TEST_DB_PATH)
+
+def init_test_db(db_path:str) -> None:
+    """テスト用のDBファイルを初期化する
+    """
+    conn = sqlite3.connect(db_path)
 
     # 事前準備用データを挿入
     conn.executescript(CREATE_PRE_USERS_TABLE)
     conn.executescript(INSERT_INTO_PRE_USERS)
+    conn.commit()
+    conn.close()
 
 @pytest.fixture
-def pipeline_def() -> PipelineDefinition:
-    """PipelineDefinitionオブジェクトを返す"""
-    return parse_toml_data(DB_DEFINITION_TOML)
+def data_pipeline_for_sqlite(tmp_path: str) -> tuple[PipelineDefinition, str]:
+    """SQLite用のデータパイプラインのテスト
+    (挿入するデータベースを毎回別の一時ファイルとして作成)
 
-def test_execute_data_pipeline(pipeline_def:PipelineDefinition):
+    Returns
+    -------
+    tuple[PipelineDefinition, str]
+        データパイプライン定義とDBファイルのパス
+    """
+    db_path = path.join(tmp_path, 'test-pipeline.sqlite')
+    td = parse_toml_data(DB_DEFINITION_TOML)
+
+    if isinstance(td.table_definition, SQLiteDBDefinition):
+        td.table_definition.path = db_path
+    else:
+        raise ValueError("Invalid DB definition")
+
+    return td, db_path
+
+def test_execute_data_pipeline(
+        data_pipeline_for_sqlite: tuple[PipelineDefinition, str]
+    ) -> None:
     """execute_data_pipelineのテスト"""
-    get_connection()
-    execute_data_pipeline(pipeline_def)
-
-    conn = sqlite3.connect(TEST_DB_PATH)
+    td, db_path = data_pipeline_for_sqlite
+    init_test_db(db_path)
+    execute_data_pipeline(td)
+    conn = sqlite3.connect(db_path)
     cur = conn.cursor()
 
     cur.execute("SELECT * FROM users")
     rows = cur.fetchall()
     assert len(rows) == 10
+
+    conn.close()
