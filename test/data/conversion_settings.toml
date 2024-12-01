@@ -1,0 +1,393 @@
+# ==============================================================================
+# [csv2json] csv -> json 変換設定
+#
+# ジョブカン経費精算/ワークフローの画面からダウンロードしたCSVファイルを、
+# データベース格納のためJSON形式に変換する際の設定
+# ==============================================================================
+[csv2json]
+
+# ==============================================================================
+# [csv2json.import_settings] 読み込むCSVファイルの設定
+#
+# 　CSVファイルの読み込みに関する以下の設定を行います。
+# - csv_encoding : CSVファイルの文字コード
+#   - 指定しない場合は "cp932" が使用されます
+#   - Excelなどで`shift_jis`として開いている場合は "cp932" を指定してください
+# - delimiter : CSVファイルの区切り文字
+#   - 指定しない場合は "," が使用されます
+# - quotechar : CSVファイルの引用符
+#   - 指定しない場合は '"' が使用されます
+# - csv_folder_path : 対象のCSVファイルが存在するフォルダのパス
+#   - 絶対パスで指定してください
+# - csv_file_name : CSVファイルのファイル名 (正規表現)
+#   - ファイル名の正規表現を指定します
+#   - $1がフォームの名前、$2がフォルダ内での連番を表します
+#   - デフォルトは "request_(.*?)_\\d{14}_\\d+_(\\d+).csv" です。
+#     - 例: フォーム名が「物品購入稟議申請書」、連番が「3」の場合、以下のようなファイル名
+#       にマッチします
+#     - `request_物品購入稟議申請書_20240101120000_2341_3.csv`
+# ==============================================================================
+[csv2json.import_settings]
+# CSVファイルの文字コード
+csv_encoding = "cp932"
+
+# 対象のCSVファイルが存在するフォルダのパス
+csv_folder_path = "path/to/csv/folder"
+# CSVファイルのファイル名 (正規表現)
+csv_file_name = "request_(.*?)_\\d{14}_\\d+_(\\d+).csv"
+
+# ==============================================================================
+# フォームの設定についての説明
+#
+# 　ジョブカン経費精算/ワークフローの画面からダウンロードしたCSVファイルは、
+# [フォーム形式](https://jobcanwf.zendesk.com/hc/ja/articles/223307427-フォーム形式とは何ですか)
+# により異なる項目を持ちます。
+# - 汎用フォーム　　：`general_form`として設定します。
+# - 経費精算フォーム：`expense_form`として設定します。
+# - 支払依頼フォーム：`payment_form`として設定します。
+#
+# 　各フォームには、共通項目とフォーム固有の項目があります。
+# - 共通項目：
+#   - "general", "expense", "payment" の各フォームで共通の項目です。
+#   - 各フォームの直下 (`[csv2json.general_form]`等) に `common_items` として設定します。
+# - フォーム固有の項目（任意）：
+#   - 追加項目
+#     - 申請書作成時に追加した項目です。
+#     - 各申請書の直下 (`[csv2json.payment_form.12345678]`等) に `extended_items` として設定します。
+#     - 設定しない場合、追加項目が0個のフォームとして扱われます。
+#   - 明細項目
+#     - 明細表の種別名、およびその項目名です。
+#     - 各申請書の直下 (`[csv2json.payment_form.12345678]`等) に `detail_items` として設定します。
+#     - 設定しない場合、明細項目が0個のフォームとして扱われます。
+#
+# 　いずれの項目も、各要素は、[表示名, JSONキー, データ型, 説明] の順で設定します。
+#   - 表示名: CSVのタイトル行に表示される項目名
+#   - JSONキー: JSONに変換する際のキー名（ASCII文字のみ）
+#   - データ型: JSONに変換した後のデータ型
+#     - "": 変換しない
+#     - "to-int": 数値型(整数)への変換
+#     - "to-float" 数値型(実数)への変換
+#     - "to-string" 文字列型への変換
+#     - "to-bool" 真偽値型への変換
+#   - 説明: 項目の説明（任意）
+#
+# 注意点：
+# - JSONキーは、ASCII文字のみで設定してください。
+#   - これはSQL文の中で名前付きプレースホルダーとして使用されるためです。
+#   - 正しく動作しなくなる可能性があります。
+# - JSONキーは、各 `xxx_items` の中で一意である必要があります。以下に、同じキー名を設定することの
+#   可否の例を示します。「可」とした場所では、同じキー名を設定することができます。
+#   - 可： `[csv2json.general_form]`の`common_items` と `[csv2json.expense_form]`の`common_items`
+#   - 可： `[csv2json.payment_form]`の`common_items` と `[csv2json.payment_form.12345678]`の`extended_items`
+#   - 可： `[csv2json.payment_form.12345678]`の`extended_items` と `[csv2json.payment_form.12345678]`の`detail_items`
+#   - 可： `[csv2json.payment_form.12345678]`の`extended_items` と `[csv2json.payment_form.23456789]`の`extended_items`
+#   - 不可： `[csv2json.payment_form]`の`common_items`の中（異なる表示名であっても）
+# ==============================================================================
+
+# ==============================================================================
+# [csv2json.general_form] 汎用フォームの設定
+# ==============================================================================
+[csv2json.general_form]
+# 汎用フォームにおける共通項目の設定
+# 各要素は、[表示名, JSONキー, データ型, 説明(任意)] の順
+common_items = [
+    ["申請ID", "id", "", "申請書のID"],
+    ["申請ステータス", "status", "", "ダウンロード時点での申請書のステータス"],
+    ["最終承認日", "final_approved_date", "", "申請が「完了」の場合、最終承認日時"],
+    ["承認者", "approvers_and_dates", "", "既に承認された承認者名と承認日時"],
+    ["フォーム名", "form_name", "", "申請書のフォーム名"],
+    ["タイトル", "title", "", "申請書のタイトル"],
+    ["申請者メールアドレス", "applicant_email", "", "申請者のメールアドレス"],
+    ["申請者コード", "applicant_code", "", "申請者に設定されたスタッフコード"],
+    ["申請者名（姓）", "applicant_last_name", "", "申請者の苗字"],
+    ["申請者名（名）", "applicant_first_name", "", "申請者の名前"],
+    ["申請日時", "application_date", "", "申請した日時"],
+    ["関連プロジェクト名", "related_project_name", "", "「関連プロジェクト」で選択したプロジェクト"],
+    ["関連グループ名", "related_group_name", "", "「関連グループ」で選択したグループ"],
+    ["コメント", "comments", "", "申請書の承認状況欄にコメントされたユーザー名、内容、日時"]
+]
+
+# ==============================================================================
+# [csv2json.expense_form] 経費精算フォームの設定
+# ==============================================================================
+[csv2json.expense_form]
+# 経費精算フォームにおける共通項目の設定
+# 各要素は、[表示名, JSONキー, データ型, 説明(任意)] の順
+common_items = [
+    ["申請ID", "id", "", "申請書のID"],
+    ["申請ステータス", "status", "", "ダウンロード時点での申請書のステータス"],
+    ["最終承認日", "final_approved_date", "", "申請が「完了」の場合、最終承認日時"],
+    ["承認者", "approvers_and_dates", "", "既に承認された承認者名と承認日時"],
+    ["フォーム名", "form_name", "", "申請書のフォーム名"],
+    ["タイトル", "title", "", "申請書のタイトル"],
+    ["申請者メールアドレス", "applicant_email", "", "申請者のメールアドレス"],
+    ["申請者コード", "applicant_code", "", "申請者に設定されたスタッフコード"],
+    ["申請者名（姓）", "applicant_last_name", "", "申請者の苗字"],
+    ["申請者名（名）", "applicant_first_name", "", "申請者の名前"],
+    ["申請日時", "application_date", "", "申請した日時"],
+    ["関連グループ名", "related_group_name", "", "「関連グループ」で選択したグループ"],
+    ["関連プロジェクト名", "related_project_name", "", "「関連プロジェクト」で選択したプロジェクト"],
+    ["経費の内訳", "expense_breakdown", "", "申請時に選択した経費の内訳"],
+    ["利用日", "usage_date", "", "申請時に入力した利用日"],
+    ["金額", "amount", "to-int", "申請時に入力した金額(明細がある場合はその合計金額)"],
+    ["内容", "description", "", "申請時に入力した「内容」"],
+    ["支払方法", "payment_method", "", "申請時に選択した支払方法"],
+    ["事前申請タイトル", "pre_application_title", "", "「事前申請」で選択した申請書のタイトル"],
+    ["事前申請ID", "pre_application_id", "", "「事前申請」で選択した申請書の申請ID"],
+    ["事前申請金額", "pre_application_amount", "to-int", "「事前申請」で選択した申請書の事前申請金額"],
+    ["仮払希望額", "advance_payment_request_amount", "to-int", "仮払を「利用する」と選択した「事前申請」で入力した仮払希望額"],
+    ["仮払期日", "advance_payment_due_date", "", "仮払を「利用する」と選択した「事前申請」で入力した仮払期日"],
+    ["仮払支払確定額", "advance_payment_confirmed_amount", "to-int", "実際に支払われた仮払金額"],
+    ["コメント", "comments", "", "申請書の承認状況欄にコメントされたユーザー名、内容、日時"]
+]
+
+# 立替精算・交通費(書式3-3.) の設定
+[csv2json.expense_form.54142953]
+# 立替精算・交通費(書式3-3.) における追加項目の設定
+# 各要素は、[表示名, JSONキー, データ型, 説明(任意)] の順
+extended_items = [
+    ["備考", "remarks", "", ""],
+    ["【申請にあたっての確認事項】", "confirmation_items", "", ""]
+]
+
+# 立替精算・交通費(書式3-3.) における明細項目の設定
+# 各要素は、[表示名, JSONキー, データ型, 説明(任意)] の順
+detail_items = [
+    ["明細の名前", "detail_name", "", "明細表の種別名"],
+    ["交通費明細の内訳", "transportation_expense_breakdown", "", ""],
+    ["交通費明細の利用日", "transportation_expense_usage_date", "", ""],
+    ["交通費明細の出発", "transportation_expense_departure", "", ""],
+    ["交通費明細の到着", "transportation_expense_arrival", "", ""],
+    ["交通費明細の往復", "transportation_expense_round_trip", "", ""],
+    ["交通費明細の交通手段", "transportation_expense_transportation", "", ""],
+    ["交通費明細の金額", "transportation_expense_amount", "to-int", ""],
+    ["交通費明細の目的・備考", "transportation_expense_purpose", "", ""],
+    ["交通費明細のグループ", "transportation_expense_group", "", ""],
+    ["交通費明細のプロジェクト", "transportation_expense_project", "", ""],
+    ["交通費明細の支払先", "transportation_expense_payee", "", ""],
+    ["交通費明細の支払先登録番号", "transportation_expense_payee_registration_number", "", ""],
+    ["交通費明細の区分", "transportation_expense_classification", "", ""]
+]
+
+# ==============================================================================
+# [csv2json.payment_form] 支払依頼フォームの設定
+# ==============================================================================
+[csv2json.payment_form]
+# 支払依頼フォームにおける共通項目の設定
+# 各要素は、[表示名, JSONキー, データ型, 説明(任意)] の順
+common_items = [
+    ["申請ID", "id", "", "申請書のID"],
+    ["申請ステータス", "status", "", "ダウンロード時点での申請書のステータス"],
+    ["最終承認日", "final_approved_date", "", "申請が「完了」の場合、最終承認日時"],
+    ["承認者", "approvers_and_dates", "", "既に承認された承認者名と承認日時"],
+    ["フォーム名", "form_name", "", "申請書のフォーム名"],
+    ["タイトル", "title", "", "申請書のタイトル"],
+    ["申請者メールアドレス", "applicant_email", "", "申請者のメールアドレス"],
+    ["申請者コード", "applicant_code", "", "申請者に設定されたスタッフコード"],
+    ["申請者名（姓）", "applicant_last_name", "", "申請者の苗字"],
+    ["申請者名（名）", "applicant_first_name", "", "申請者の名前"],
+    ["申請日時", "application_date", "", "申請した日時"],
+    ["関連プロジェクト名", "related_project_name", "", "「関連プロジェクト」で選択したプロジェクト"],
+    ["関連グループ名", "related_group_name", "", "「関連プロジェクト」で選択したグループ"],
+    ["関連申請タイトル", "related_application_title", "", "「関連申請」で選択した申請書のタイトル"],
+    ["関連申請ID", "related_application_id", "", "「関連申請」で選択した申請書の申請ID"],
+    ["事前申請タイトル", "pre_application_title", "", "「事前申請」で選択した申請書のタイトル"],
+    ["事前申請ID", "pre_application_id", "", "「事前申請」で選択した申請書の申請ID"],
+    ["支払依頼の内訳", "payment_request_breakdown", "", "申請時に選択した支払の内訳"],
+    ["計上日", "accounting_date", "", "申請時に入力した計上日"],
+    ["金額", "amount", "to-int", "申請時に入力した金額(明細がある場合はその合計金額)"],
+    ["内容", "description", "", "申請時に入力した支払依頼の内容"],
+    ["支払予定日", "payment_scheduled_date", "", "申請時に入力した支払予定日"],
+    ["振込手数料", "transfer_fee", "", "申請時に振込手数料で選択した当方負担か先方負担か"],
+    ["源泉徴収税", "withholding_tax", "", "申請時に源泉徴収税で選択したなし、あり(税抜)、あり(税込)のいずれか"],
+    ["支払先名", "payee_name", "", "申請時に入力/選択した支払先の名称"],
+    ["銀行コード", "bank_code", "", "申請時に入力/選択した支払先の銀行コード"],
+    ["銀行名", "bank_name", "", "申請時に入力/選択した支払先の銀行名"],
+    ["支店コード", "branch_code", "", "申請時に入力/選択した支払先の支店コード"],
+    ["支店名", "branch_name", "", "申請時に入力/選択した支払先の支店名"],
+    ["口座種別", "account_type", "", "申請時に入力/選択した支払先の口座種別"],
+    ["口座番号", "account_number", "", "申請時に入力/選択した支払先の口座番号"],
+    ["口座名", "account_name", "", "申請時に入力/選択した支払先の口座名"],
+    ["コメント", "comments", "", "申請書の承認状況欄にコメントされたユーザー名、内容、日時"]
+]
+
+# 支払依頼申請書（書式4-1. 支払・請求書）の設定
+[csv2json.payment_form.41052205]
+# 支払依頼申請書（書式4-1. 支払・請求書）における追加項目の設定
+# 各要素は、[表示名, JSONキー, データ型, 説明(任意)] の順
+extended_items = [
+    ["源泉徴収税額", "withholding_tax_amount", "to-int", ""],
+    ["請求書の添付", "invoice_attachment", "", ""],
+    ["請求書の受取方法", "invoice_receipt_method", "", ""],
+    ["支払頻度", "payment_frequency", "", ""],
+    ["備考", "remarks", "", ""],
+    ["【申請にあたっての確認事項】", "confirmation_items", "", ""],
+    ["新しい項目", "new_item", "", ""]
+]
+
+# ==============================================================================
+# [json2sql] JSON -> SQL 変換設定
+#
+# 　JSON形式のデータをデータベースに格納する際の設定
+# ==============================================================================
+[json2sql]
+
+# ==============================================================================
+# [json2sql.output] データを出力するDB・テーブルの設定
+#
+# 　出力先のDB・テーブルに関して、以下を共通で設定します。
+# - type: データベースの種類
+#   - 現在は "SQLite" のみ対応
+# - tables: 作成するテーブルを定義するSQL文
+#   - 念のため `IF NOT EXISTS` を付与してください
+#
+# ========= 個別設定: SQLite =========
+# 　SQLiteの場合、以下を追加で設定します。
+# - path: データベースファイルのパス
+#   - 絶対パスで指定してください
+# ==============================================================================
+[json2sql.output]
+type = "SQLite"
+path = "path/to/db/db.sqlite"
+tables = []
+
+# ==============================================================================
+# [json2sql.pipeline] JSONデータをテーブルに格納する際の設定
+#
+# 　JSONの取得元を`json2sql.pipeline.sources`で指定し、
+# テーブルへの格納方法を`json2sql.pipeline.insertion_profile`で指定します。
+# ==============================================================================
+[json2sql.pipeline]
+
+# ==============================================================================
+# [[json2sql.pipeline.sources]] データソースの設定
+#
+# 　JSONデータの取得元を指定します。データベースやAPIからデータを取得したい場合には
+# 以下に指定します。ただし、`csv2json`で設定したフォームについては、以下に記述する
+# ことなく自動的に取得されます。
+#
+# 　取得元のデータソースについて、以下を共通で設定します。
+# - name: データソースの名前
+#   - 一つのtomlファイル内で一意である必要があります
+#   - 以降の`json2sql.pipeline.insertion_profile`で使用します
+# - type: データソースの種類
+#   - 現在は "API" と "SQLite" のみ対応
+# - result_format: データ取得結果の形式
+#   - "DB-flat-rows" : `list[tuple[Any, ...]]`型
+#     - 例: `[('1-1', '1-2', ...), ('2-1', '2-2', ...), ...]`
+#     - DB: `SELECT *` や `SELECT key1, key2, ...` などで取得されるケース
+#   - "json-object-results" : `list[tuple[dict[str, Any]]]`型
+#     - 例: `[(dict(key1='1-1', key2='1-2',), ...]`
+#     - DB: `SELECT json_object(key1, key2, ...) FROM ...` などで取得されるケース。各tupleは1つのJSONオブジェクトのみを含む
+#   - "nested-json" : `dict[str, Any]`型
+#     - 例: `{'results': [dict(key1='1-1', key2='1-2', ...), ...], 'other_key': ...}`
+#     - API: 複数のデータが単一のJSONとして取得されるケース。データのリストに対応するキー名は`results_key`で指定
+#   - "multiple-json-entries" : `list[dict[str, Any]]`型
+#     - 例: `[dict(key1='1-1', key2='1-2', ...), ...]`
+#     - API: 一回のリクエストごとに一つのJSONが取得できるケース。全リクエストの結果をリストに格納 (`v1/requests`APIなど)
+# - results_key : データリストに対応するキー名
+#   - デフォルトは`"results"`
+#   - "nested-json"の場合のみ要求され、指定されない場合はデフォルト値が使用されます
+#
+# ========= 個別設定: API =========
+# 　APIの場合、以下を追加で設定します。
+# - endpoint : APIのベースURL
+# - headers : リクエストヘッダー
+#   - 指定しない場合はデフォルトのヘッダーが使用される
+#   - 指定する場合は辞書型で指定、デフォルトのヘッダーとマージされる
+#   - 例: `{"Authorization" = "Bearer xxxxxxxx"}`
+# - params : リクエストパラメーター
+#
+# ========= 個別設定: SQLite =========
+# 　SQLiteの場合、以下を追加で設定します。
+# - path : DBのファイルパス
+# - query : データ取得用のクエリ
+# ==============================================================================
+[[json2sql.pipeline.sources]]
+
+# ==============================================================================
+# [json2sql.pipeline.insertion_profile] テーブルへの格納方法の設定
+#
+# 　JSONデータをテーブルに格納する際の設定を指定します。`[json2sql.output]`の
+# `tables`に指定したテーブル名をキーとして設定を行います。例として、`tables`に
+# `"CREATE TABLE IF NOT EXISTS new_table ..."` と指定した場合、
+# `[json2sql.pipeline.insertion_profile.new_table]`以下で設定を行います。
+#
+# 　テーブルへの格納方法について、以下を共通で設定します。
+# - source: データソースの名前
+#   - `csv2json`または`json2sql.pipeline.sources`で指定したデータソースの名前
+#   - `csv2json`の場合は、以下のように指定します。
+#     - `"csv2json.general_form"` : 汎用フォームのデータ
+#       - 汎用フォーム共通で指定可能な要素（この場合は`common_items`）のみが使用可能です
+#     - `"csv2json.expense_form.12345678"` : form_idが12345678の経費精算フォームのデータ
+#       - 経費精算フォーム共通で指定可能な要素（この場合は`common_items`）が使用可能です
+#       - form_idごとに指定可能な要素（この場合は`extended_items`と`detail_items`）も使用可能です
+# - query: テーブルへの格納用のSQL文
+#   - プレースフォルダーは以下のどちらかのみを使用してください
+#     - `?` (positional placeholder): データの順番に対応
+#     - `:key` (named placeholder): データのキーに対応
+#   - 例: `INSERT INTO table_name (column1, column2) VALUES (:key1, :key2)`
+# - positional_parameters: query内で`?`を使用する場合のデータ変換
+#   - 指定しない場合は、入力のデータがそのまま使用されます
+#   - 位置パラメータに対応するデータの取得方法を指定します（詳細は「具体例：positional_parameters」を参照）
+# - named_parameters: query内で`:key`を使用する場合のデータ変換
+#   - 指定しない場合は、入力のJSONデータがそのまま使用されます
+#   - 名前付きパラメータに対応するデータの取得方法を指定します（詳細は「具体例：named_parameters」を参照）
+# - conversion_method: データ型の変換方法（任意）
+#   - `to-int`, `to-float`, `to-str`, `to-bool`のいずれかを指定
+#   - 詳細は「具体例：positional_parameters」、「具体例：named_parameters」を参照
+#
+# ========= 具体例：positional_parameters =========
+# 　入力の1つ目のJSONデータが以下の場合を考えます。
+# >>> { "id": "123456",
+# ...   "name": "John Doe",
+# ...   "group": [{"g-id": "gA"}, {"g-id": "gB"}]}
+#
+# 　`query`に`INSERT INTO table_name (id, name, group_id) VALUES (?, ?, ?)`を
+# 指定した場合、`positional_parameters`に以下のように指定します。
+# >>> positional_parameters = [
+# ...     ["id"],
+# ...     ["name"],
+# ...     ["group", -1, "g-id"]
+# ... ]
+# 　`group`はリストなので、`-1`を指定して各要素を取得します（この場合、"group"の
+# 各要素の"g-id"を取得するため、1つのJSONデータに対して2つのクエリが実行されます）。
+#
+# 　また、"table_name"の`id`カラムが`int`型である場合、`conversion_method`を使用して
+# データ型を変換します。この場合、変換したいのは0番目の要素（`id`）なので、以下のように指定します。
+# >>> conversion_method = [
+# ...     0, "to-int"
+# ... ]
+#
+# 　以上の変換により、上記のデータに対して、実際には以下のクエリが実行されます。
+# >>> INSERT INTO table_name (id, name, group_id) VALUES (123456, 'John Doe', 'gA');
+# >>> INSERT INTO table_name (id, name, group_id) VALUES (123456, 'John Doe', 'gB');
+#
+# ========= 具体例：named_parameters =========
+# 　入力の1つ目のJSONデータが以下の場合を考えます。
+# >>> { "user_id": "123456",
+# ...   "name": "John Doe",
+# ...   "group": [{"g-id": "gA"}, {"g-id": "gB"}]}
+#
+# 　`query`に`INSERT INTO table_name (id, name, group_id) VALUES (:id, :name, :group_id)`を
+# 指定した場合、`named_parameters`に以下のように指定します。
+# >>> named_parameters = [
+# ...     "id", ["user_id"]
+# ...     "name", ["name"]
+# ...     "group_id", ["group", -1, "g-id"]
+# ... ]
+# 　`group`はリストなので、`-1`を指定して各要素を取得します（この場合、"group"の
+# 各要素の"g-id"を取得するため、1つのJSONデータに対して2つのクエリが実行されます）。
+#
+# 　また、"table_name"の`id`カラムが`int`型である場合、`conversion_method`を使用して
+# データ型を変換します。この場合、変換したいのは`id`なので、以下のように指定します。
+# >>> conversion_method = [
+# ...     "id", "to-int"
+# ... ]
+#
+# 　以上の変換により、上記のデータに対して、実際には以下のクエリが実行されます。
+# >>> INSERT INTO table_name (id, name, group_id) VALUES (123456, 'John Doe', 'gA');
+# >>> INSERT INTO table_name (id, name, group_id) VALUES (123456, 'John Doe', 'gB');
+# ==============================================================================
+[json2sql.pipeline.insertion_profile]
+
