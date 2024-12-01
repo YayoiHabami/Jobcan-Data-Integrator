@@ -95,14 +95,14 @@ class FormItems:
         - 'general_form': 汎用フォーム
         - 'expense_form': 経費精算フォーム
         - 'payment_form': 支払依頼フォーム
-    form_id : Optional[int]
-        フォームのID
+    form_unique_key : Optional[str]
+        フォームを指定する固有のキー (form_idなど)
     common : list[list[str]]
         各form_typeごとに共通の項目
     extended : list[list[str]]
-        (form_idごとに固有の) 追加項目、申請書作成時に追加した項目
+        (フォームごと(=form_idごと)ごとに固有の) 追加項目、申請書作成時に追加した項目
     detail : list[list[str]]
-        (form_idごとに固有の) 明細項目
+        (フォームごと(=form_idごと)ごとに固有の) 明細項目
 
     Notes
     -----
@@ -115,8 +115,12 @@ class FormItems:
     - 'general_form': 汎用フォーム
     - 'expense_form': 経費精算フォーム
     - 'payment_form': 支払依頼フォーム"""
-    form_id: Optional[int] = None
-    """フォームのID"""
+    form_unique_key: Optional[str] = None
+    """フォームを指定する固有のキー (form_idなど)
+    tomlファイルの [csv2json.form_items.<form_type>.<form_unique_key>] に対応する"""
+
+    form_name: Optional[str] = None
+    """フォームの名前 (完全一致)"""
 
     common: list[list[str]] = field(default_factory=list)
     """各form_typeごとに共通の項目
@@ -124,16 +128,16 @@ class FormItems:
     - `list[str]`は長さ4のリストで、[表示名、JSONキー、データ型、説明]を表す"""
 
     extended: list[list[str]] = field(default_factory=list)
-    """(form_idごとに固有の) 追加項目、申請書作成時に追加した項目
+    """(フォームごと(=form_idごと)に固有の) 追加項目、申請書作成時に追加した項目
 
     - `list[str]`は長さ4のリストで、[表示名、JSONキー、データ型、説明]を表す
-    - form_idが指定されている場合のみ使用される"""
+    - form_unique_keyが指定されている場合のみ使用される"""
 
     detail: list[list[str]] = field(default_factory=list)
-    """(form_idごとに固有の) 明細項目
+    """(フォームごと(=form_idごと)ごとに固有の) 明細項目
 
     - `list[str]`は長さ4のリストで、[表示名、JSONキー、データ型、説明]を表す
-    - form_idが指定されている場合のみ使用される"""
+    - form_unique_keyが指定されている場合のみ使用される"""
 
 @dataclass
 class CsvToJsonSettings:
@@ -157,8 +161,8 @@ class CsvToJsonSettings:
         """
         return list(self.form_items.keys())
 
-    def get_form_ids(self, form_type:str) -> list[int]:
-        """form_typeに対応するフォームIDのリストを取得する
+    def get_form_unique_keys(self, form_type:str) -> list[str]:
+        """form_typeに対応するフォーム
 
         Parameters
         ----------
@@ -167,13 +171,14 @@ class CsvToJsonSettings:
 
         Returns
         -------
-        list[int]
-            form_typeに対応するフォームIDのリスト
+        list[str]
+            form_typeに対応するフォームのform_unique_keyのリスト.
+            各form_unique_keyはtomlファイルの [csv2json.form_items.<form_type>.<form_uk>] に対応する
         """
         if form_type not in self.form_items:
             return []
-        return [form.form_id for form in self.form_items[form_type]
-                if form.form_id is not None]
+        return [form.form_unique_key for form in self.form_items[form_type]
+                if form.form_unique_key is not None]
 
     def get_form_items(self, form_type:str,
                        remove_specifics:bool=False) -> list[FormItems]:
@@ -184,7 +189,7 @@ class CsvToJsonSettings:
         form_type : str
             フォームの種類、'general_form', 'expense_form', 'payment_form'
         remove_specifics : bool
-            Trueの場合、form_idが指定されているFormItemsを除外する
+            Trueの場合、form_unique_keyが指定されているFormItemsを除外する
             (このため、戻り値リストの要素数は1となる)
 
         Returns
@@ -196,29 +201,55 @@ class CsvToJsonSettings:
             return []
         if remove_specifics:
             return [form for form in self.form_items[form_type]
-                    if form.form_id is None]
+                    if form.form_unique_key is None]
         return self.form_items[form_type]
 
-    def get_form_item(self, form_type:str, form_id:int) -> Optional[FormItems]:
-        """form_type, form_idに対応するFormItemsを取得する
+    def get_form_item(self, form_type:str,
+                      *,
+                      form_unique_key:Optional[str] = None,
+                      form_name: Optional[str] = None) -> Optional[FormItems]:
+        """form_type, form_ukに対応するFormItemsを取得する
 
         Parameters
         ----------
         form_type : str
             フォームの種類、'general_form', 'expense_form', 'payment_form'
-        form_id : int
-            フォームのID
+        form_unique_key : str
+            form_unique_keyかform_nameのいずれかを指定する
+            フォームを特定するためのキー (form_idなど).
+            conversion_settings.toml の [csv2json.form_items.<form_type>.<form_unique_key>] に対応する
+        form_name : str
+            form_ukかform_nameのいずれかを指定する
+            フォームの名前 (完全一致)
 
         Returns
         -------
         Optional[FormItems]
-            form_type, form_idに対応するFormItems
+            form_type, form_ukに対応するFormItems
             (見つからない場合はNone)
+
+        Raises
+        ------
+        ValueError
+            - form_unique_keyとform_nameのどちらも指定されていない場合
         """
+        if form_unique_key is None and form_name is None:
+            raise ValueError("Either form_unique_key or form_name must be specified")
+
         if form_type not in self.form_items:
             return None
-        return next((form for form in self.form_items[form_type]
-                     if form.form_id == form_id), None)
+
+        for form in self.form_items[form_type]:
+            # 各要素について指定されたキー/名前が一致するか確認
+            # 両方指定されている場合は両方一致するものを返す
+            if ((form_unique_key is not None)
+                    and (form.form_unique_key != form_unique_key)):
+                continue
+            if ((form_name is not None)
+                    and (form.form_name != form_name)):
+                continue
+            return form
+        return None
 
 @dataclass
 class ConversionSettings:
@@ -408,7 +439,7 @@ def _parse_form_items_array(data: toml_items.Item) -> list[list[str]]:
 
 def _parse_specific_form_items(
         data: toml_items.Item, common_items: list[list[str]],
-        form_type: str, form_id: int
+        form_type: str, form_unique_key: str
     ) -> FormItems:
     """特定のフォームの項目を解析する
 
@@ -416,14 +447,14 @@ def _parse_specific_form_items(
     ----------
     data : toml_items.Item
         特定のフォームの項目のTOMLデータ
-        [csv2json.form_items.<form_type>.<form_id>] セクションのデータ
+        [csv2json.form_items.<form_type>.<form_unique_key>] セクションのデータ
     common_items : list[list[str]]
         各form_typeごとに共通の項目、
         [csv2json.form_items.<form_type>] の common_items のデータ
     form_type : str
         フォームの種類、'general_form', 'expense_form', 'payment_form'
-    form_id : int
-        フォームのID
+    form_unique_key : str
+        フォームを特定するためのキー
 
     Returns
     -------
@@ -431,7 +462,16 @@ def _parse_specific_form_items(
         特定のフォームの項目
     """
     if not isinstance(data, toml_items.Table):
-        raise ValueError(f"Specific form items (id: {form_id}) must be a table")
+        raise ValueError(f"Specific form items (id: {form_unique_key}) must be a table")
+
+    # フォームの名前を取得する
+    if ((form_name := data.get("form_name", None)) is not None
+            and isinstance(form_name, toml_items.String)):
+        form_name = form_name.value
+    else:
+        # フォームの名前が存在しない場合はエラー
+        raise ValueError(f"The `form_name` does not exist or is not a string " \
+                            f"(id: {form_unique_key})")
 
     # フォームの追加項目を取得する
     extended_items = []
@@ -439,7 +479,8 @@ def _parse_specific_form_items(
         try:
             extended_items = _parse_form_items_array(_extended)
         except ValueError as e:
-            raise ValueError(f"{e.args[0]} in `extended_items` section (id: {form_id})") from e
+            raise ValueError(f"{e.args[0]} in `extended_items` section " \
+                             f"(id: {form_unique_key})") from e
 
     # フォームの明細項目を取得する
     detail_items = []
@@ -447,9 +488,13 @@ def _parse_specific_form_items(
         try:
             detail_items = _parse_form_items_array(_detail)
         except ValueError as e:
-            raise ValueError(f"{e.args[0]} in `detail_items` section (id: {form_id})") from e
+            raise ValueError(f"{e.args[0]} in `detail_items` section " \
+                             f"(id: {form_unique_key})") from e
 
-    return FormItems(form_type, form_id, common=deepcopy(common_items),
+    return FormItems(form_type,
+                     form_unique_key=form_unique_key,
+                     form_name=form_name,
+                     common=deepcopy(common_items),
                      extended=extended_items, detail=detail_items)
 
 def _parse_form_items(data: toml_items.Item, form_type: str) -> list[FormItems]:
@@ -482,8 +527,8 @@ def _parse_form_items(data: toml_items.Item, form_type: str) -> list[FormItems]:
         raise ValueError("Form items must be a table")
 
     # フォームの全IDを取得する
-    form_ids: list[str] = [k for k in data.keys()
-                           if (k != "common_items") and (k.isnumeric())]
+    form_unique_keys: list[str] = [k for k in data.keys()
+                                   if (k != "common_items") and (k.isnumeric())]
 
     # フォームの共通項目 (`common_items`) を取得する
     if (_common_items := data.get("common_items", None)) is None:
@@ -492,17 +537,17 @@ def _parse_form_items(data: toml_items.Item, form_type: str) -> list[FormItems]:
         common_items = _parse_form_items_array(_common_items)
     except ValueError as e:
         raise ValueError(f"{e.args[0]} in `common_items` section") from e
-    form_items = [FormItems(form_type, None, common=common_items)]
+    form_items = [FormItems(form_type, common=common_items)]
 
-    for form_id in form_ids:
-        # 特定のform_idのフォームの項目を取得する
-        specific_form = data[form_id]
+    for form_uk in form_unique_keys:
+        # 特定のform_unique_keyのフォームの項目を取得する
+        specific_form = data[form_uk]
         try:
             form_items.append(
-                _parse_specific_form_items(specific_form, common_items, form_type, int(form_id))
+                _parse_specific_form_items(specific_form, common_items, form_type, form_uk)
             )
         except ValueError as e:
-            raise ValueError(f"{e.args[0]} in `{form_id}` section") from e
+            raise ValueError(f"{e.args[0]} in `{form_uk}` section") from e
 
     return form_items
 
