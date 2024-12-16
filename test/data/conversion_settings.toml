@@ -118,6 +118,18 @@ common_items = [
     ["コメント", "comments", "", "申請書の承認状況欄にコメントされたユーザー名、内容、日時"]
 ]
 
+[csv2json.general_form.form_4_3]
+form_name = "支払依頼申請書（書式4-3. 窓口・コンビニ払い）"
+
+[csv2json.general_form.form_4_4]
+form_name = "支払依頼申請書（書式4-4. 口座振替）"
+
+[csv2json.general_form.form_4_5]
+form_name = "コーポレートカード領収書提出フォーム（書式4-5.）"
+
+[csv2json.general_form.form_4_9]
+form_name = "入金エビデンス提出フォーム（書式4-9.）"
+
 # ==============================================================================
 # [csv2json.expense_form] 経費精算フォームの設定
 # ==============================================================================
@@ -159,7 +171,7 @@ optional_items = [
     "支払先名", "支払先登録番号"
 ]
 
-[csv2json.expense_form.54142953]
+[csv2json.expense_form.form_3_3]
 form_name = "立替精算・交通費(書式3-3.)"
 # 追加項目の設定; 各要素は [表示名, JSONキー, データ型, 説明(任意)] の順
 extended_items = [
@@ -233,7 +245,7 @@ optional_items = [
     "支払先登録番号"
 ]
 
-[csv2json.payment_form.41052205]
+[csv2json.payment_form.form_4_1]
 form_name = "支払依頼申請書（書式4-1. 支払・請求書）"
 # 追加項目の設定; 各要素は [表示名, JSONキー, データ型, 説明(任意)] の順
 extended_items = [
@@ -245,6 +257,12 @@ extended_items = [
     ["【申請にあたっての確認事項】", "confirmation_items", "", ""],
     ["新しい項目", "new_item", "", ""]
 ]
+
+[csv2json.payment_form.form_4_2]
+form_name = "支払依頼申請書（書式4-2. 社員振込）"
+
+[csv2json.payment_form.form_4_6]
+form_name = "支払依頼申請書（書式4-6. 社員への仮払代理申請）"
 
 # ==============================================================================
 # [json2sql] JSON -> SQL 変換設定
@@ -428,7 +446,7 @@ CREATE TABLE IF NOT EXISTS general_form_4_1 (
 
 [json2sql.pipeline.insertion_profile.general_form_4_1]
 # データソース名
-source = "csv2json.payment_form.41052205"
+source = "csv2json.payment_form.form_4_1"
 # テーブルへの格納用のSQL文
 query = """
 INSERT INTO general_form_4_1 (

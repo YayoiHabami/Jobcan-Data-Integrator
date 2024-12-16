@@ -49,7 +49,7 @@ from jobcan_di.database.data_pipeline import (
 )
 from jobcan_di.database.data_pipeline.transformation import convert_data_type_specific
 
-from ._conversion_settings import CsvToJsonSettings
+from ._conversion_settings import CsvToJsonSettings, FormItems
 
 
 
@@ -328,12 +328,11 @@ def _single_request_items(
 def _single_request_to_json(
         form_type:str,
         titles:list[str], data:list[str],
-        settings:CsvToJsonSettings,
         details: Optional[list[list[str]]],
-        *,
-        form_unique_key: Optional[str] = None,
-        form_name: Optional[str] = None
-    ) -> tuple[ParsedCSVData, list[list[str]], list[list[str]]]:
+        common_form: FormItems,
+        extended_items: Optional[list[list[str]]],
+        detail_items: Optional[list[list[str]]],
+    ) -> ParsedCSVData:
     """一つの申請書について、CSVファイルのデータを整形する
 
     Parameters
@@ -344,18 +343,15 @@ def _single_request_to_json(
         CSVファイルのタイトル行
     data : list[str]
         CSVファイルのデータ行(1行分)
-    settings : CsvToJsonSettings
-        CSV->JSON読込・変換設定、`conversion_setting.toml`から読み込む
     details : Optional[list[list[str]]]
         明細項目 (経費精算・支払依頼フォームのみ).
         存在する場合はその行数分のデータを与える
-    form_unique_key : Optional[str]
-        form_unique_keyとform_nameのいずれかを指定する.
-        フォームのID、追加・明細項目を取得する際に使用する.
-        TOMLファイルの [csv2json.form_items.<form_type>.<form_unique_key>] に対応する
-    form_name : Optional[str]
-        form_unique_keyとform_nameのいずれかを指定する.
-        フォームの種類、追加・明細項目を取得する際に使用する.
+    common_form : FormItems
+        フォーム毎に共通の項目
+    extended_items : Optional[list[list[str]]]
+        追加項目のタイトル行のリスト、項目の自動判定を行った場合は判定された項目が格納される
+    detail_items : Optional[list[list[str]]]
+        明細項目のタイトル行のリスト、項目の自動判定を行った場合は判定された項目が格納される
 
     Returns
     -------
@@ -365,53 +361,19 @@ def _single_request_to_json(
         - "extends": 追加項目、form_id毎に異なる (OrderedDict)
         - "details": 明細項目、経費精算・支払依頼フォームのみ (list[dict])
         二つ目のキーで各項目を取得
-    list[list[str]]
-        追加項目のタイトル行のリスト、項目の自動判定を行った場合は判定された項目が格納される.
-        外側のリストの各要素は [表示名, JSONキー, データ型, コメント] .
-    list[list[str]]
-        明細項目のタイトル行のリスト、項目の自動判定を行った場合は判定された項目が格納される.
-        外側のリストの各要素は [表示名, JSONキー, データ型, コメント] .
 
     Raises
     ------
     ValueError
-        - `conversion_settings.toml`の`csv2json`に指定されたフォームの種類が存在しない場合
-        - `conversion_settings.toml`の`csv2json`の各項目で指定されたタイトル(表示名)の
-          データがCSV側に存在しない場合
-        - `conversion_settings.toml`の`csv2json`の各項目で指定されたデータ型が未対応の場合
-        - 追加・明細項目の自動判定に失敗した場合
+        - タイトルが存在しない場合 (optional_titlesに指定がある場合を除く)
+        - 未対応のデータ型が指定された場合
     """
     ret = ParsedCSVData(form_type=form_type)
 
-    # フォーム毎に共通の項目を取得
-    forms = settings.get_form_items(form_type, remove_specifics=True)
-    if not forms:
-        # 指定されたフォームが存在しない場合はエラーを返す
-        raise ValueError(f"Form type '{form_type}' not found in conversion_settings.toml")
-    ret.common = _single_request_items(forms[0].common, titles, [data])[0]
-    ret.titles["common"] = {i[1]: i[0] for i in forms[0].common}
+    ret.common = _single_request_items(common_form.common, titles, [data])[0]
+    ret.titles["common"] = {i[1]: i[0] for i in common_form.common}
     ret.dtypes["common"] = {i[1]: ParameterConversionMethod[i[2] or "TO_STRING"]
-                            for i in forms[0].common}
-
-    unique_form = None
-    extended_items, detail_items = [], []
-    if (form_unique_key is not None) or (form_name is not None):
-        # フォームのID or フォームの種類が指定されている場合は、追加・明細項目を取得
-        unique_form = settings.get_form_item(form_type,
-                                             form_unique_key=form_unique_key,
-                                             form_name=form_name)
-    if unique_form is not None:
-        # conversion_settings上に定義済みの追加・明細項目が存在する場合
-        extended_items = unique_form.extended
-        detail_items = unique_form.detail
-    else:
-        # conversion_settings上に定義済みの追加・明細項目が存在しない場合
-        # ファイル構造から追加・明細項目を自動判定・取得する
-        try:
-            extended_items, detail_items = extract_additional_items(titles, forms[0].common)
-        except ValueError as e:
-            # 追加・明細項目の自動判定に失敗した場合はエラーを返す
-            raise ValueError(f"Failed to extract extended and detail items: {e}") from e
+                            for i in common_form.common}
 
     # 追加項目を取得
     if extended_items is not None:
@@ -427,7 +389,7 @@ def _single_request_to_json(
         ret.dtypes["details"] = {i[1]: ParameterConversionMethod[i[2] or "TO_STRING"]
                                  for i in detail_items}
 
-    return ret, extended_items, detail_items
+    return ret
 
 def parse_csv_data(
         data: list[list[str]], settings: CsvToJsonSettings,
@@ -495,7 +457,11 @@ def parse_csv_data(
                          f"the common items. Title: {titles}")
 
     ret: list[ParsedCSVData] = []
-    extended_items, detail_items = [], []
+    extended_items, detail_items = _detect_additional_items(
+        form_type, titles, settings,
+        form_unique_key=form_unique_key, form_name=form_name
+    )
+    common_form = settings.get_form_items(form_type, remove_specifics=True)[0]
 
     i = 0
     while i + 1 < len(data):
@@ -513,14 +479,76 @@ def parse_csv_data(
             i += 1
             details.append(data[i])
 
-        parsed, extended_items, detail_items = _single_request_to_json(
-            form_type, titles, data_row, settings, details,
-            form_unique_key=form_unique_key, form_name=form_name
+        parsed = _single_request_to_json(
+            form_type, titles, data_row, details,
+            common_form, extended_items, detail_items
         )
 
         ret.append(parsed)
 
     return ret, extended_items, detail_items
+
+def _detect_additional_items(
+        form_type: str, titles: list[str], settings: CsvToJsonSettings,
+        *,
+        form_unique_key: Optional[str] = None,
+        form_name: Optional[str] = None
+    ) -> tuple[list[list[str]], list[list[str]]]:
+    """追加・明細項目を取得する。conversion_settings上に定義済みの項目が存在しない場合は自動判定する
+
+    Parameters
+    ----------
+    form_type : str
+        フォームの種類、"general_form", "expense_form", "payment_form"のいずれか
+    titles : list[str]
+        CSVファイルのタイトル行
+    settings : CsvToJsonSettings
+        CSV->JSON読込・変換設定、`conversion_setting.toml`から読み込む
+    form_unique_key : Optional[str]
+        フォームのID、追加・明細項目を取得する際に使用する.
+        TOMLファイルの [csv2json.form_items.<form_type>.<form_unique_key>] に対応する
+    form_name : Optional[str]
+        フォームの種類、追加・明細項目を取得する際に使用する.
+
+    Returns
+    -------
+    tuple[list[list[str]], list[list[str]]]
+        追加項目と明細項目のタイトル行のリスト.
+        それぞれのリストは、表示名・JSONキー・データ型・コメントの順で格納される.
+        自動生成のため、データ型・コメントは空文字列で初期化される.また、JSONキーは
+        ExcelにCSVを読み込んだ際の列名 (A, B, C, ..., AA, AB, ...) となる.
+
+    Raises
+    ------
+    ValueError
+        - 指定されたform_typeが存在しない場合
+        - 共通項目が空、または末尾が"コメント"でない場合
+        - タイトル行の冒頭部分が共通項目の表示名と一致しない場合 ("コメント"を除く)
+    """
+    # フォーム毎に共通の項目を取得
+    common_forms = settings.get_form_items(form_type, remove_specifics=True)
+    if not common_forms:
+        # 指定されたフォームが存在しない場合はエラーを返す
+        raise ValueError(f"Form type '{form_type}' not found in conversion_settings.toml")
+
+    unique_form = None
+    if (form_unique_key is not None) or (form_name is not None):
+        # フォームのID or フォームの種類が指定されている場合は、追加・明細項目を取得
+        unique_form = settings.get_form_item(form_type,
+                                             form_unique_key=form_unique_key,
+                                             form_name=form_name)
+
+    if (unique_form is not None) and unique_form.additional_items_specified:
+        # conversion_settings上に定義済みの追加・明細項目が存在する場合
+        return unique_form.extended, unique_form.detail
+    else:
+        # conversion_settings上に定義済みの追加・明細項目が存在しない場合
+        # ファイル構造から追加・明細項目を自動判定・取得する
+        try:
+            return extract_additional_items(titles, common_forms[0].common)
+        except ValueError as e:
+            # 追加・明細項目の自動判定に失敗した場合はエラーを返す
+            raise ValueError(f"Failed to extract extended and detail items: {e}") from e
 
 def parse_csv(
         file_path: str, settings: CsvToJsonSettings,

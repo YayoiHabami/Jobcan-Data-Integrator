@@ -110,6 +110,9 @@ class FormItems:
         (フォームごと(=form_idごと)ごとに固有の) 明細項目
     optional_items : dict[str, list[str]]
         フォームの項目のうち任意項目 (その項目が存在しない場合もある)
+    additional_items_specified : bool
+        追加項目が指定されているか、
+        conversion_settingsでフォーム名 (form_name) と form_unique_key のみを指定している場合は False
 
     Notes
     -----
@@ -153,6 +156,14 @@ class FormItems:
 
     - キーは "common", "extends", "details"
       - 例) optional_items["common"] = ["表示名1", "表示名2", ...]
+    """
+
+    additional_items_specified: bool = True
+    """追加項目が指定されているか
+
+    フォーム名 (form_name) と form_unique_key のみを指定している場合は False となり、
+    項目の自動判定が必要となる。
+    (特殊化されていない、common_itemsのみのFormItemsについても True; `[csc2json.<form_type>]`のもの)
     """
 
 @dataclass
@@ -570,12 +581,16 @@ def _parse_specific_form_items(
             raise ValueError(f"{e.args[0]} in `detail_items` section " \
                              f"(id: {form_unique_key})") from e
 
+    # 追加項目が指定されているか
+    additional_items_specified = False if ((_extended is None) and (_detail is None)) else True
+
     return FormItems(form_type,
                      form_unique_key=form_unique_key,
                      form_name=form_name,
                      common=deepcopy(common_form.common),
                      extended=extended_items, detail=detail_items,
-                     optional_items=deepcopy(common_form.optional_items))
+                     optional_items=deepcopy(common_form.optional_items),
+                     additional_items_specified=additional_items_specified)
 
 def _parse_form_items(data: toml_items.Item, form_type: str) -> list[FormItems]:
     """フォームの項目を解析する
@@ -606,9 +621,10 @@ def _parse_form_items(data: toml_items.Item, form_type: str) -> list[FormItems]:
     if not isinstance(data, toml_items.Table):
         raise ValueError("Form items must be a table")
 
-    # フォームの全IDを取得する
-    form_unique_keys: list[str] = [k for k in data.keys()
-                                   if (k != "common_items") and (k.isnumeric())]
+    # フォームの全IDを取得する (テーブルのキー全て)
+    form_unique_keys: list[str] = [
+        k for k in data.keys() if isinstance(data[k], toml_items.Table)
+    ]
 
     # フォームの共通項目 (`common_items`) を取得する
     if (_common_items := data.get("common_items", None)) is None:
@@ -628,7 +644,8 @@ def _parse_form_items(data: toml_items.Item, form_type: str) -> list[FormItems]:
     else:
         optional_common_items: list[str] = []
 
-    form_items = [FormItems(form_type, common=common_items)]
+    form_items = [FormItems(form_type, common=common_items,
+                            additional_items_specified=False)]
     form_items[0].optional_items["common"] = optional_common_items
 
     for form_uk in form_unique_keys:
