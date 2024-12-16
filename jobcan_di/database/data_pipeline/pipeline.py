@@ -18,13 +18,13 @@ will create that database file and create that table.
 
 ```python
 from jobcan_di.database.data_pipeline.parser import parse_toml
-from jobcan_di.database.data_pipeline.pipeline import execute_data_pipeline
+from jobcan_di.database.data_pipeline.pipeline import execute_etl_pipeline
 
 # Get pipeline definition from toml file
 pipeline_def = parse_toml('db_definition.toml')
 
 # Execute ETL processing
-execute_data_pipeline(pipeline_def)
+execute_etl_pipeline(pipeline_def)
 ```
 """
 from typing import Any, Optional, Callable
@@ -118,7 +118,7 @@ def init_tables(table_definition:DBDefinition,
 # (Extract -> Transform -> Load)
 #
 
-def execute_data_pipeline(definition:PipelineDefinition) -> None:
+def execute_etl_pipeline(definition:PipelineDefinition) -> None:
     """Execute the data pipeline.
     Extract data from the sources, transform it, and load it into the target table.
 

@@ -9,7 +9,7 @@ from jobcan_di.database.data_pipeline import (
 )
 from jobcan_di.database.data_pipeline.parser import parse_toml_data
 from jobcan_di.database.data_pipeline.pipeline import (
-    execute_data_pipeline
+    execute_etl_pipeline
 )
 
 
@@ -128,13 +128,13 @@ def data_pipeline_for_sqlite(tmp_path: str) -> tuple[PipelineDefinition, str]:
 
     return td, db_path
 
-def test_execute_data_pipeline(
+def test_execute_etl_pipeline(
         data_pipeline_for_sqlite: tuple[PipelineDefinition, str]
     ) -> None:
-    """execute_data_pipelineのテスト"""
+    """execute_etl_pipelineのテスト"""
     td, db_path = data_pipeline_for_sqlite
     init_test_db(db_path)
-    execute_data_pipeline(td)
+    execute_etl_pipeline(td)
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
 

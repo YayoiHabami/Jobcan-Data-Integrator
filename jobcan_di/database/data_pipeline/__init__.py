@@ -30,18 +30,18 @@ data_pipeline.parser
 data_pipeline.pipeline
     Provides functions to execute ETL processes.
     Main functions:
-    - execute_data_pipeline: Execute ETL process based on PipelineDefinition
+    - execute_etl_pipeline: Execute ETL process based on PipelineDefinition
 
 Examples
 --------
 >>> from data_pipeline.parser import parse_toml
->>> from data_pipeline.pipeline import execute_data_pipeline
+>>> from data_pipeline.pipeline import execute_etl_pipeline
 >>>
 >>> # Get pipeline definition from TOML file
 >>> pipeline_def = parse_toml('db_definition.toml')
 >>>
 >>> # Execute ETL process
->>> execute_data_pipeline(pipeline_def)
+>>> execute_etl_pipeline(pipeline_def)
 
 See Also
 --------
