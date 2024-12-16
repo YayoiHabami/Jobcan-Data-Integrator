@@ -123,7 +123,6 @@ def extract_data_source(settings: CsvToJsonSettings) -> list[RawDataSource]:
                 "", data = [p.to_dict() for p in parsed]
             ))
             unnamed_count += 1
-            print(source_name, form_name, "  ---  ", list(parsed[0].titles["common"].values()))
 
     return sources
 

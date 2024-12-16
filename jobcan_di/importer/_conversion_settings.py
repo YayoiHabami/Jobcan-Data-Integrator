@@ -108,6 +108,8 @@ class FormItems:
         (フォームごと(=form_idごと)ごとに固有の) 追加項目、申請書作成時に追加した項目
     detail : list[list[str]]
         (フォームごと(=form_idごと)ごとに固有の) 明細項目
+    optional_items : dict[str, list[str]]
+        フォームの項目のうち任意項目 (その項目が存在しない場合もある)
 
     Notes
     -----
@@ -143,6 +145,15 @@ class FormItems:
 
     - `list[str]`は長さ4のリストで、[表示名、JSONキー、データ型、説明]を表す
     - form_unique_keyが指定されている場合のみ使用される"""
+
+    optional_items: dict[str, list[str]] = field(default_factory=lambda: {
+        "common": [], "extends": [], "details": []
+    })
+    """フォームの項目のうち任意項目 (その項目が存在しない場合もある)
+
+    - キーは "common", "extends", "details"
+      - 例) optional_items["common"] = ["表示名1", "表示名2", ...]
+    """
 
 @dataclass
 class CsvToJsonSettings:
@@ -506,7 +517,7 @@ def _parse_form_items_array(data: toml_items.Item) -> list[list[str]]:
     return form_items
 
 def _parse_specific_form_items(
-        data: toml_items.Item, common_items: list[list[str]],
+        data: toml_items.Item, common_form: FormItems,
         form_type: str, form_unique_key: str
     ) -> FormItems:
     """特定のフォームの項目を解析する
@@ -562,8 +573,9 @@ def _parse_specific_form_items(
     return FormItems(form_type,
                      form_unique_key=form_unique_key,
                      form_name=form_name,
-                     common=deepcopy(common_items),
-                     extended=extended_items, detail=detail_items)
+                     common=deepcopy(common_form.common),
+                     extended=extended_items, detail=detail_items,
+                     optional_items=deepcopy(common_form.optional_items))
 
 def _parse_form_items(data: toml_items.Item, form_type: str) -> list[FormItems]:
     """フォームの項目を解析する
@@ -605,14 +617,26 @@ def _parse_form_items(data: toml_items.Item, form_type: str) -> list[FormItems]:
         common_items = _parse_form_items_array(_common_items)
     except ValueError as e:
         raise ValueError(f"{e.args[0]} in `common_items` section") from e
+
+    # フォームの共通項目のうち任意項目を取得する
+    if (_optional_common_items := data.get("optional_items", None)) is not None:
+        # list[str] に変換
+        if not isinstance(_optional_common_items, toml_items.Array):
+            raise ValueError("Optional common items must be an array")
+        optional_common_items = [i.value for i in _optional_common_items
+                                 if isinstance(i, toml_items.String)]
+    else:
+        optional_common_items: list[str] = []
+
     form_items = [FormItems(form_type, common=common_items)]
+    form_items[0].optional_items["common"] = optional_common_items
 
     for form_uk in form_unique_keys:
         # 特定のform_unique_keyのフォームの項目を取得する
         specific_form = data[form_uk]
         try:
             form_items.append(
-                _parse_specific_form_items(specific_form, common_items, form_type, form_uk)
+                _parse_specific_form_items(specific_form, form_items[0], form_type, form_uk)
             )
         except ValueError as e:
             raise ValueError(f"{e.args[0]} in `{form_uk}` section") from e

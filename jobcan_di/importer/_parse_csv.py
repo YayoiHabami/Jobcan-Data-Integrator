@@ -151,8 +151,9 @@ def classify_form_type(
         # フォームの種類を自動判定しない場合はNoneを返す
         return None
 
-    # 冒頭部分が共通項目の表示名と一致したform_typeの (一致したタイトル数, form_type) のリスト
-    matched_forms: list[tuple[int, str]] = []
+    # 冒頭部分が共通項目の表示名と一致したform_typeの
+    # (一致したタイトル数, 不足したタイトル数, form_type) のリスト
+    matched_forms: list[tuple[int, int, str]] = []
 
     for form_type in settings.get_form_types():
         # form_typeに対応するフォームの、共通項目のみを取得する
@@ -164,12 +165,18 @@ def classify_form_type(
         common_titles = common_titles[:-1] if common_titles[-1] == "コメント" else common_titles
 
         # タイトル行の冒頭部分が共通項目の表示名と一致するか判定
-        if set(titles[:len(common_titles)]) == set(common_titles):
-            matched_forms.append((len(common_titles), form_type))
+        if (shortage := set(common_titles) - set(titles[:len(common_titles)])):
+            # 一致しない場合は、optional_itemsにすべての不足が含まれる場合のみ追加
+            # (任意項目以外も不足している場合はは、フォームタイプが異なると判定)
+            if set(shortage) - set(item.optional_items["common"]) == set():
+                matched_forms.append((len(common_titles), len(shortage), form_type))
+        else:
+            # 一致した場合はそのまま返す
+            matched_forms.append((len(common_titles), 0, form_type))
 
-    # 一致した項目数が最も多いものを返す
+    # 一致した項目数が最も多いものを返す (同数が複数存在する場合は不足数が最も少ないもの)
     if matched_forms:
-        return max(matched_forms, key=lambda x: x[0])[1]
+        return max(matched_forms, key=lambda x: (x[0], -x[1]))[2]
     # フォームの種類が見つからない場合はNoneを返す
     return None
 
@@ -253,7 +260,9 @@ def extract_additional_items(
 
 def _single_request_items(
         common_items: list[list[str]],
-        titles:list[str], data:list[list[str]]
+        titles:list[str], data:list[list[str]],
+        *,
+        optional_titles: Optional[list[str]] = None
     ) -> list[OrderedDict[str, Any]]:
     """一つの申請書について、CSVファイルのデータを整形する
 
@@ -266,6 +275,8 @@ def _single_request_items(
     data : list[list[str]]
         CSVファイルのデータ行
         1行で完結する場合も list[list[str]] として与える
+    optional_titles : Optional[list[str]]
+        存在しないことを許容する列のタイトル
 
     Returns
     -------
@@ -276,7 +287,7 @@ def _single_request_items(
     Raises
     ------
     ValueError
-        - タイトルが存在しない場合
+        - タイトルが存在しない場合 (optional_titlesに指定がある場合を除く)
         - 未対応のデータ型が指定された場合
 
     Notes
@@ -295,8 +306,12 @@ def _single_request_items(
             try:
                 _data = data_i[titles.index(title)]
             except ValueError:
-                # タイトルが存在しない場合はエラーを返す
-                raise ValueError(f"Title '{title}' not found in CSV file")
+                if optional_titles and title in optional_titles:
+                    # optional_titles で title が指定されている場合は空文字列を取得
+                    _data = ""
+                else:
+                    # タイトルが存在しない場合はエラーを返す
+                    raise ValueError(f"Title '{title}' not found in CSV file")
 
             # データ型を変換
             # data_typeはParameterConversionMethodに変換できることを検証済み: TOML読込時)
