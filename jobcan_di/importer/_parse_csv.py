@@ -14,6 +14,28 @@ Functions
 - `parse_csv_data`: CSVファイルのデータを整形する
 - `parse_csv`: CSVファイルを読み込み、データを整形する
 - `csv_to_raw_data_source`: 整形されたCSVデータをRawDataSourceに変換する
+
+Examples
+--------
+CSVファイルを読み込み、データを整形する例を以下に示します。
+
+ここで上記CSVに対応するフォームの詳細な記述がconversion_settings.tomlに存在しない場合、
+すなわち対応する`[form_items.<form_type>.<form_unique_key>]`が存在しない場合、
+項目の自動判定・取得を行います。このため、`extended_items`と`detail_items`は自動判定された
+項目 (例: `[["追加項目1", "W", "", ""], ...]`) が格納されます。この際、データ型とコメントは
+空文字列で初期化され、JSONキーはExcelにCSVを読み込んだ際の列名 (A, B, C, ..., AA, AB, ...)
+となります。
+
+```python
+from jobcan_di.importer import parse_csv, parse_toml
+
+# conversion_settings.tomlから設定を読み込む
+settings = parse_toml("conversion_settings.toml")
+
+# CSVファイルを読み込み、データを整形する
+csv_path = "path/to/csv_file.csv"
+data, extended_items, detail_items = parse_csv(csv_path, settings)
+```
 """
 from collections import OrderedDict
 import csv
@@ -37,6 +59,8 @@ class ParsedCSVData:
 
     Attributes
     ----------
+    form_type : str
+        フォームの種類; "general_form", "expense_form", "payment_form"のいずれか
     common : OrderedDict[str, Any]
         共通項目 (フォームの種類ごとに共通)
     extends : OrderedDict[str, Any]
@@ -44,12 +68,29 @@ class ParsedCSVData:
     details : list[OrderedDict[str, Any]]
         明細項目 (経費精算・支払依頼フォームのみ)
     """
+    form_type: str = ""
+    """フォームの種類; "general_form", "expense_form", "payment_form"のいずれか"""
     common: OrderedDict[str, Any] = field(default_factory=OrderedDict)
     """共通項目 (フォームの種類ごとに共通)"""
     extends: OrderedDict[str, Any] = field(default_factory=OrderedDict)
     """追加項目 (フォームのIDごとに異なる)"""
     details: list[OrderedDict[str, Any]] = field(default_factory=list)
     """明細項目 (経費精算・支払依頼フォームのみ)"""
+
+    titles: dict[str, dict[str, str]] = field(
+        default_factory=lambda: {"common": dict(), "extends": dict(), "details": dict()}
+    )
+    """各項目の表示名、"common", "extends", "details"の各項目に対して表示名を格納
+
+    titles["common"]["json_key"] = "表示名"
+    """
+    dtypes: dict[str, dict[str, ParameterConversionMethod]] = field(
+        default_factory=lambda: {"common": dict(), "extends": dict(), "details": dict()}
+    )
+    """各項目のデータ型、"common", "extends", "details"の各項目に対してデータ型を格納
+
+    dtypes["common"]["json_key"] = ParameterConversionMethod
+    """
 
     def to_dict(self) -> dict[str, Any]:
         """dictに変換する
@@ -70,7 +111,10 @@ class ParsedCSVData:
 #
 
 def classify_form_type(
-        titles: list[str], settings: CsvToJsonSettings
+        titles: list[str], settings: CsvToJsonSettings,
+        *,
+        form_name: Optional[str] = None,
+        auto_detect: bool = True
     ) -> Optional[str]:
     """フォームの種類を判定する
 
@@ -81,6 +125,10 @@ def classify_form_type(
     settings : CsvToJsonSettings
         CSV->JSON読込・変換設定、`conversion_setting.toml`から読み込む
         この`get_form_types`メソッドで取得できるフォームの種類を判定する
+    form_name : Optional[str]
+        フォーム名、指定された名称がsettingsに存在する場合はそのフォームの種類を返す
+    auto_detect : bool
+        フォームの種類を自動判定するかどうか
 
     Returns
     -------
@@ -93,7 +141,19 @@ def classify_form_type(
     -----
     - タイトル行の冒頭数列分（共通項目の数分、"コメント"除く）が共通項目の表示名と一致するか判定する
     - 要素が一致していれば順番は問わない
+    - 一致するフォームが複数存在する場合は、一致した項目数が最も多いフォームを返す
+      (general_formが優先されないようにする)
     """
+    if (form_type := settings.get_form_type(form_name=form_name)) is not None:
+        # 指定されているform_nameに対応するフォームの種類が存在する場合はそのまま返す
+        return form_type
+    elif not auto_detect:
+        # フォームの種類を自動判定しない場合はNoneを返す
+        return None
+
+    # 冒頭部分が共通項目の表示名と一致したform_typeの (一致したタイトル数, form_type) のリスト
+    matched_forms: list[tuple[int, str]] = []
+
     for form_type in settings.get_form_types():
         # form_typeに対応するフォームの、共通項目のみを取得する
         item = settings.get_form_items(form_type, remove_specifics=True)[0]
@@ -105,8 +165,11 @@ def classify_form_type(
 
         # タイトル行の冒頭部分が共通項目の表示名と一致するか判定
         if set(titles[:len(common_titles)]) == set(common_titles):
-            return form_type
+            matched_forms.append((len(common_titles), form_type))
 
+    # 一致した項目数が最も多いものを返す
+    if matched_forms:
+        return max(matched_forms, key=lambda x: x[0])[1]
     # フォームの種類が見つからない場合はNoneを返す
     return None
 
@@ -243,7 +306,6 @@ def _single_request_items(
                 ret_i[key] = convert_data_type_specific(_data, conv_method)
             else:
                 ret_i[key] = _data
-
         ret.append(ret_i)
 
     return ret
@@ -256,7 +318,7 @@ def _single_request_to_json(
         *,
         form_unique_key: Optional[str] = None,
         form_name: Optional[str] = None
-    ) -> ParsedCSVData:
+    ) -> tuple[ParsedCSVData, list[list[str]], list[list[str]]]:
     """一つの申請書について、CSVファイルのデータを整形する
 
     Parameters
@@ -288,6 +350,12 @@ def _single_request_to_json(
         - "extends": 追加項目、form_id毎に異なる (OrderedDict)
         - "details": 明細項目、経費精算・支払依頼フォームのみ (list[dict])
         二つ目のキーで各項目を取得
+    list[list[str]]
+        追加項目のタイトル行のリスト、項目の自動判定を行った場合は判定された項目が格納される.
+        外側のリストの各要素は [表示名, JSONキー, データ型, コメント] .
+    list[list[str]]
+        明細項目のタイトル行のリスト、項目の自動判定を行った場合は判定された項目が格納される.
+        外側のリストの各要素は [表示名, JSONキー, データ型, コメント] .
 
     Raises
     ------
@@ -298,7 +366,7 @@ def _single_request_to_json(
         - `conversion_settings.toml`の`csv2json`の各項目で指定されたデータ型が未対応の場合
         - 追加・明細項目の自動判定に失敗した場合
     """
-    ret = ParsedCSVData()
+    ret = ParsedCSVData(form_type=form_type)
 
     # フォーム毎に共通の項目を取得
     forms = settings.get_form_items(form_type, remove_specifics=True)
@@ -306,6 +374,9 @@ def _single_request_to_json(
         # 指定されたフォームが存在しない場合はエラーを返す
         raise ValueError(f"Form type '{form_type}' not found in conversion_settings.toml")
     ret.common = _single_request_items(forms[0].common, titles, [data])[0]
+    ret.titles["common"] = {i[1]: i[0] for i in forms[0].common}
+    ret.dtypes["common"] = {i[1]: ParameterConversionMethod[i[2] or "TO_STRING"]
+                            for i in forms[0].common}
 
     unique_form = None
     extended_items, detail_items = [], []
@@ -330,19 +401,25 @@ def _single_request_to_json(
     # 追加項目を取得
     if extended_items is not None:
         ret.extends = _single_request_items(extended_items, titles, [data])[0]
+        ret.titles["extends"] = {i[1]: i[0] for i in extended_items}
+        ret.dtypes["extends"] = {i[1]: ParameterConversionMethod[i[2] or "TO_STRING"]
+                                 for i in extended_items}
 
     # 明細項目を取得
     if (details is not None) and (detail_items is not None):
         ret.details = _single_request_items(detail_items, titles, details)
+        ret.titles["details"] = {i[1]: i[0] for i in detail_items}
+        ret.dtypes["details"] = {i[1]: ParameterConversionMethod[i[2] or "TO_STRING"]
+                                 for i in detail_items}
 
-    return ret
+    return ret, extended_items, detail_items
 
 def parse_csv_data(
         data: list[list[str]], settings: CsvToJsonSettings,
         *,
         form_unique_key: Optional[str] = None,
         form_name: Optional[str] = None
-    ) -> list[ParsedCSVData]:
+    ) -> tuple[list[ParsedCSVData], list[list[str]], list[list[str]]]:
     """CSVファイルのデータを整形する
 
     Parameters
@@ -356,6 +433,12 @@ def parse_csv_data(
         TOMLファイルの [csv2json.form_items.<form_type>.<form_unique_key>] に対応する
     form_name : Optional[str]
         フォームの種類、追加・明細項目を取得する際に使用する.
+    list[list[str]]
+        追加項目のタイトル行のリスト、項目の自動判定を行った場合は判定された項目が格納される.
+        外側のリストの各要素は [表示名, JSONキー, データ型, コメント] .
+    list[list[str]]
+        明細項目のタイトル行のリスト、項目の自動判定を行った場合は判定された項目が格納される.
+        外側のリストの各要素は [表示名, JSONキー, データ型, コメント] .
 
     Returns
     -------
@@ -373,14 +456,21 @@ def parse_csv_data(
         - `conversion_settings.toml`の`csv2json`の各項目で指定されたタイトル(表示名)の
           データがCSV側に存在しない場合
         - `conversion_settings.toml`の`csv2json`の各項目で指定されたデータ型が未対応の場合
+        - 追加・明細項目の自動判定に失敗した場合
 
     Notes
     -----
     - `form_unique_key`と`form_name`のどちらも指定しない場合、または指定したフォームの記述が
       `conversion_settings.toml`に存在しない場合は、追加・明細項目を自動判定・取得する
+    - 追加・明細項目の自動判定を行わない際に、form_nameが指定されていない場合は空のデータを返す
     """
     titles = data[0]
-    form_type = classify_form_type(titles, settings)
+    auto_detect = settings.csv_import_settings.enable_auto_form_detection
+    form_type = classify_form_type(titles, settings,
+                                   form_name=form_name,auto_detect=auto_detect)
+    if (form_type is None) and (not auto_detect):
+        # フォームの種類を自動判定しない場合に、フォームの種類が見つからない場合は空のデータを返す
+        return [], [], []
     if form_type is None:
         # フォームの種類が見つからない場合はエラーを返す
         # (settingsで指定されたいずれのフォームにも該当しない場合)
@@ -390,6 +480,7 @@ def parse_csv_data(
                          f"the common items. Title: {titles}")
 
     ret: list[ParsedCSVData] = []
+    extended_items, detail_items = [], []
 
     i = 0
     while i + 1 < len(data):
@@ -407,18 +498,21 @@ def parse_csv_data(
             i += 1
             details.append(data[i])
 
-        ret.append(_single_request_to_json(
+        parsed, extended_items, detail_items = _single_request_to_json(
             form_type, titles, data_row, settings, details,
-            form_unique_key=form_unique_key, form_name=form_name))
+            form_unique_key=form_unique_key, form_name=form_name
+        )
 
-    return ret
+        ret.append(parsed)
+
+    return ret, extended_items, detail_items
 
 def parse_csv(
         file_path: str, settings: CsvToJsonSettings,
         *,
         form_unique_key: Optional[str] = None,
         form_name: Optional[str] = None
-    ) -> list[ParsedCSVData]:
+    ) -> tuple[list[ParsedCSVData], list[list[str]], list[list[str]]]:
     """CSVファイルを読み込み、データを整形する
 
     Parameters
@@ -432,6 +526,12 @@ def parse_csv(
         TOMLファイルの [csv2json.form_items.<form_type>.<form_unique_key>] に対応する
     form_name : str
         フォームの種類、追加・明細項目を取得する際に使用する.
+    list[list[str]]
+        追加項目のタイトル行のリスト、項目の自動判定を行った場合は判定された項目が格納される.
+        外側のリストの各要素は [表示名, JSONキー, データ型, コメント] .
+    list[list[str]]
+        明細項目のタイトル行のリスト、項目の自動判定を行った場合は判定された項目が格納される.
+        外側のリストの各要素は [表示名, JSONキー, データ型, コメント] .
 
     Returns
     -------
@@ -449,11 +549,13 @@ def parse_csv(
         - `conversion_settings.toml`の`csv2json`の各項目で指定されたタイトル(表示名)の
           データがCSV側に存在しない場合
         - `conversion_settings.toml`の`csv2json`の各項目で指定されたデータ型が未対応の場合
+        - 追加・明細項目の自動判定に失敗した場合
 
     Notes
     -----
     - `form_unique_key`と`form_name`のどちらも指定しない場合、または指定したフォームの記述が
       `conversion_settings.toml`に存在しない場合は、追加・明細項目を自動判定・取得する
+    - 追加・明細項目の自動判定を行わない際に、form_nameが指定されていない場合は空のデータを返す
     """
     # Windowsの場合、クォートされた文字列内の改行に余分な\rが追加されないようにする
     newline = "" if os.name == "nt" else None

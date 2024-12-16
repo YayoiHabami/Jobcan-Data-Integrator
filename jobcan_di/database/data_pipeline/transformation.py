@@ -746,7 +746,17 @@ def convert_data_type_specific(data: Any, method: ParameterConversionMethod) -> 
     -------
     Any
         Converted data
+
+    Notes
+    -----
+    - If the data is None or an empty string, it will be converted to None.
+      - (For `TO_STRING` method, it will be converted to an empty string)
     """
+    if (data is None) or (data == ""):
+        if method == ParameterConversionMethod.TO_STRING:
+            return ""
+        return None
+
     if method == ParameterConversionMethod.TO_INT:
         return int(data)
     elif method == ParameterConversionMethod.TO_FLOAT:

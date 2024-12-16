@@ -111,7 +111,7 @@ with sqlite3.connect('example.db') as conn:
 | ^ | `DataLink` | ETL処理の定義を保持するクラスです。<br>　データの取得方法 (`sources`メンバ) 、データの加工・書込方法 (`insertion_profiles`メンバ) を保持します。 |
 | ^ | `DataSource` | データの取得方法を保持するクラスです。<br>　`extract_data` メソッドによりデータを取得 (extract) します。 |
 | `data_pipeline.parser` | `parse_toml` / `parse_toml_data` | TOMLファイルのパス / データの文字列から `PipelineDefinition` を取得します。 |
-| `data_pipeline.pipeline` | `execute_data_pipeline` | `PipelineDefinition` のインスタンスをもとに、ETL 処理を行います。 |
+| `data_pipeline.pipeline` | `execute_etl_pipeline` | `PipelineDefinition` のインスタンスをもとに、ETL 処理を行います。 |
 
 ### `data_pipeline`: データの取得方法・DBへの書き込み方法を保持するクラス群を提供するパッケージ
 
@@ -169,13 +169,13 @@ for source in toml_data['data_link']['sources']:
 
 ```python
 from jobcan_di.database.data_pipeline.parser import parse_toml
-from jobcan_di.database.data_pipeline.pipeline import execute_data_pipeline
+from jobcan_di.database.data_pipeline.pipeline import execute_etl_pipeline
 
 # tomlファイルからパイプライン定義を取得
 pipeline_def = parse_toml('db_definition.toml')
 
 # ETL処理を実行
-execute_data_pipeline(pipeline_def)
+execute_etl_pipeline(pipeline_def)
 ```
 
 

@@ -65,6 +65,8 @@ class CsvImportSettings:
         CSVファイルの区切り文字
     quotechar : str
         CSVファイルのクオート文字
+    enable_auto_form_detection : bool
+        CSVファイルの共通項目・追加項目等の自動判定を行うか
     """
     folder: str
     """読み込むCSVファイルの格納フォルダ"""
@@ -83,6 +85,9 @@ class CsvImportSettings:
     """CSVファイルの区切り文字"""
     quotechar: str = DEFAULT_CSV_QUOTECHAR
     """CSVファイルのクオート文字"""
+
+    enable_auto_form_detection: bool = False
+    """CSVファイルの共通項目・追加項目等の自動判定を行うか"""
 
 @dataclass
 class FormItems:
@@ -161,6 +166,42 @@ class CsvToJsonSettings:
         """
         return list(self.form_items.keys())
 
+    def get_form_type(self, *,
+                      form_unique_key: Optional[str] = None,
+                      form_name: Optional[str] = None) -> Optional[str]:
+        """form_unique_keyまたはform_nameに対応するフォームの種類を取得する
+
+        Parameters
+        ----------
+        form_unique_key : str
+            form_unique_keyかform_nameのいずれかを指定する
+            フォームを特定するためのキー (form_idなど).
+            conversion_settings.toml の [csv2json.form_items.<form_type>.<form_unique_key>] に対応する
+        form_name : str
+            form_unique_keyかform_nameのいずれかを指定する
+            フォームの名前 (完全一致)
+
+        Returns
+        -------
+        Optional[str]
+            form_unique_keyまたはform_nameに対応するフォームの種類
+            (見つからない場合はNone)
+
+        Notes
+        -----
+        - form_unique_keyとform_nameの両方が指定されている場合は`form_unique_key`を優先する
+        """
+        for form_type, forms in self.form_items.items():
+            for form in forms:
+                if ((form_unique_key is not None)
+                        and (form.form_unique_key == form_unique_key)):
+                    return form_type
+                if ((form_name is not None)
+                        and (form.form_name == form_name)):
+                    return form_type
+
+        return None
+
     def get_form_unique_keys(self, form_type:str) -> list[str]:
         """form_typeに対応するフォーム
 
@@ -179,6 +220,26 @@ class CsvToJsonSettings:
             return []
         return [form.form_unique_key for form in self.form_items[form_type]
                 if form.form_unique_key is not None]
+
+    def get_form_unique_key(self, form_name: str) -> Optional[str]:
+        """form_nameに対応するフォームのform_unique_keyを取得する
+
+        Parameters
+        ----------
+        form_name : str
+            フォームの名前 (完全一致)
+
+        Returns
+        -------
+        Optional[str]
+            form_nameに対応するフォームのform_unique_key
+            (見つからない場合はNone)
+        """
+        for form_type in self.form_items:
+            for form in self.form_items[form_type]:
+                if form.form_name == form_name:
+                    return form.form_unique_key
+        return None
 
     def get_form_items(self, form_type:str,
                        remove_specifics:bool=False) -> list[FormItems]:
@@ -338,7 +399,14 @@ def _parse_csv_import_settings(data: toml_items.Item) -> CsvImportSettings:
     else:
         quotechar = DEFAULT_CSV_QUOTECHAR
 
-    return CsvImportSettings(folder, file_name_regex, encoding, delimiter, quotechar)
+    # CSVファイルの共通項目・追加項目等の自動判定を行うか
+    enable_auto_detect = data.get("enable_auto_form_detection", False)
+
+    return CsvImportSettings(
+        folder, file_name_regex,
+        encoding, delimiter, quotechar,
+        enable_auto_detect
+    )
 
 def _assert_form_item_conversion_method(method: str) -> str:
     """フォーム項目の変換方法の文字列が正しいか検証する

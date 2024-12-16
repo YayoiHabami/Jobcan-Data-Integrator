@@ -26,6 +26,11 @@
 #     - 例: フォーム名が「物品購入稟議申請書」、連番が「3」の場合、以下のようなファイル名
 #       にマッチします
 #     - `request_物品購入稟議申請書_20240101120000_2341_3.csv`
+# - enable_auto_form_detection : CSVファイルのフォームの自動判定を行うか
+#   - `true`の場合、フォーム固有の項目を設定していないものについても、自動で共通項目・追加項目・明細項目が
+#     自動で判定されてデータソースとして読み込まれます。この場合、各フォームのデータソース名は
+#     `csv2json.<form_type>.unnamed` (`csv2json.general_form.unnamed`など) となります。このため、
+#     同一のデータソース名で複数のデータソースが存在することになります。
 # ==============================================================================
 [csv2json.import_settings]
 # CSVファイルの文字コード
@@ -34,7 +39,10 @@ csv_encoding = "cp932"
 # 対象のCSVファイルが存在するフォルダのパス
 csv_folder_path = "path/to/csv/folder"
 # CSVファイルのファイル名 (正規表現)
-csv_file_name = "request_(.*?)_\\d{14}_\\d+_(\\d+).csv"
+csv_file_name = "request_(.*?)_\\d{14}_\\d+_(\\d+)\\.csv"
+
+# CSVファイルの共通項目・追加項目・明細項目の自動判定を行うか
+enable_auto_form_detection = true
 
 # ==============================================================================
 # フォームの設定についての説明
@@ -202,6 +210,7 @@ common_items = [
     ["振込手数料", "transfer_fee", "", "申請時に振込手数料で選択した当方負担か先方負担か"],
     ["源泉徴収税", "withholding_tax", "", "申請時に源泉徴収税で選択したなし、あり(税抜)、あり(税込)のいずれか"],
     ["支払先名", "payee_name", "", "申請時に入力/選択した支払先の名称"],
+    ["支払先登録番号", "payee_registration_number", "", "申請時に入力/選択した支払先の登録番号"],
     ["銀行コード", "bank_code", "", "申請時に入力/選択した支払先の銀行コード"],
     ["銀行名", "bank_name", "", "申請時に入力/選択した支払先の銀行名"],
     ["支店コード", "branch_code", "", "申請時に入力/選択した支払先の支店コード"],
@@ -210,6 +219,11 @@ common_items = [
     ["口座番号", "account_number", "", "申請時に入力/選択した支払先の口座番号"],
     ["口座名", "account_name", "", "申請時に入力/選択した支払先の口座名"],
     ["コメント", "comments", "", "申請書の承認状況欄にコメントされたユーザー名、内容、日時"]
+]
+
+# 全てのフォームに必ず存在するわけではない項目 (表示名のみ)
+optional_items = [
+    "支払先登録番号"
 ]
 
 [csv2json.payment_form.41052205]
@@ -249,7 +263,21 @@ extended_items = [
 [json2sql.output]
 type = "SQLite"
 path = "path/to/db/db.sqlite"
-tables = []
+tables = [
+"""
+CREATE TABLE IF NOT EXISTS general_form_4_1 (
+    id TEXT PRIMARY KEY,
+    status TEXT,
+    final_approved_date TEXT,
+    title TEXT,
+    applicant_code TEXT,
+    applicant_first_name TEXT,
+    applicant_last_name TEXT,
+    accounting_date TEXT,
+    amount INTEGER
+);
+"""
+]
 
 # ==============================================================================
 # [json2sql.pipeline] JSONデータをテーブルに格納する際の設定
@@ -391,3 +419,30 @@ tables = []
 # ==============================================================================
 [json2sql.pipeline.insertion_profile]
 
+[json2sql.pipeline.insertion_profile.general_form_4_1]
+# データソース名
+source = "csv2json.payment_form.41052205"
+# テーブルへの格納用のSQL文
+query = """
+INSERT INTO general_form_4_1 (
+    id, status, final_approved_date, title,
+    applicant_code, applicant_first_name, applicant_last_name,
+    accounting_date, amount
+) VALUES (
+    :id, :status, :final_approved_date, :title,
+    :applicant_code, :applicant_first_name, :applicant_last_name,
+    :accounting_date, :amount
+)
+"""
+# named placeholderの指定
+named_parameters = [
+    "id", ["common", "id"],
+    "status", ["common", "status"],
+    "final_approved_date", ["common", "final_approved_date"],
+    "title", ["common", "title"],
+    "applicant_code", ["common", "applicant_code"],
+    "applicant_first_name", ["common", "applicant_first_name"],
+    "applicant_last_name", ["common", "applicant_last_name"],
+    "accounting_date", ["common", "accounting_date"],
+    "amount", ["common", "amount"]
+]

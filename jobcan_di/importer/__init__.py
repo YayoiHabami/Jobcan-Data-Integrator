@@ -45,8 +45,15 @@ from ._conversion_settings import (
     CsvToJsonSettings, CsvImportSettings, FormItems,
     parse_toml_data, parse_toml
 )
+
 # CSVのパーサー (CSV -> JSON)
 from ._parse_csv import (
+    classify_form_type, excel_type_column_name, extract_additional_items,
     ParsedCSVData, parse_csv_data, parse_csv,
     csv_to_raw_data_source
+)
+
+# ファイルの取得
+from ._file_picker import (
+    pick_files
 )
