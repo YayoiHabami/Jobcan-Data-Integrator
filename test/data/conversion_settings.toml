@@ -292,14 +292,13 @@ tables = [
 """
 CREATE TABLE IF NOT EXISTS general_form_4_1 (
     id TEXT PRIMARY KEY,
+    form_name TEXT,
     status TEXT,
     final_approved_date TEXT,
     title TEXT,
     applicant_code TEXT,
     applicant_first_name TEXT,
-    applicant_last_name TEXT,
-    accounting_date TEXT,
-    amount INTEGER
+    applicant_last_name TEXT
 );
 """
 ]
@@ -368,6 +367,7 @@ CREATE TABLE IF NOT EXISTS general_form_4_1 (
 #
 # 　テーブルへの格納方法について、以下を共通で設定します。
 # - source: データソースの名前
+#   - 単一の文字列またはリストで指定します
 #   - `csv2json`または`json2sql.pipeline.sources`で指定したデータソースの名前
 #   - `csv2json`の場合は、以下のように指定します。
 #     - `"csv2json.general_form"` : 汎用フォームのデータ
@@ -375,6 +375,9 @@ CREATE TABLE IF NOT EXISTS general_form_4_1 (
 #     - `"csv2json.expense_form.12345678"` : form_idが12345678の経費精算フォームのデータ
 #       - 経費精算フォーム共通で指定可能な要素（この場合は`common_items`）が使用可能です
 #       - form_idごとに指定可能な要素（この場合は`extended_items`と`detail_items`）も使用可能です
+# - regex_source: データソースの正規表現パターン
+#   - 単一の文字列またはリストで指定します
+#   - sourceと同様ですが、正規表現パターンを指定します
 # - query: テーブルへの格納用のSQL文
 #   - プレースフォルダーは以下のどちらかのみを使用してください
 #     - `?` (positional placeholder): データの順番に対応
@@ -446,28 +449,25 @@ CREATE TABLE IF NOT EXISTS general_form_4_1 (
 
 [json2sql.pipeline.insertion_profile.general_form_4_1]
 # データソース名
-source = "csv2json.payment_form.form_4_1"
+regex_source = ["csv2json.\\w+_form.form_4_\\d"]
 # テーブルへの格納用のSQL文
 query = """
 INSERT INTO general_form_4_1 (
-    id, status, final_approved_date, title,
-    applicant_code, applicant_first_name, applicant_last_name,
-    accounting_date, amount
+    id, form_name, status, final_approved_date, title,
+    applicant_code, applicant_first_name, applicant_last_name
 ) VALUES (
-    :id, :status, :final_approved_date, :title,
-    :applicant_code, :applicant_first_name, :applicant_last_name,
-    :accounting_date, :amount
-)
+    :id, :form_name, :status, :final_approved_date, :title,
+    :applicant_code, :applicant_first_name, :applicant_last_name
+) ON CONFLICT(id) DO NOTHING;
 """
 # named placeholderの指定
 named_parameters = [
     "id", ["common", "id"],
+    "form_name", ["common", "form_name"],
     "status", ["common", "status"],
     "final_approved_date", ["common", "final_approved_date"],
     "title", ["common", "title"],
     "applicant_code", ["common", "applicant_code"],
     "applicant_first_name", ["common", "applicant_first_name"],
-    "applicant_last_name", ["common", "applicant_last_name"],
-    "accounting_date", ["common", "accounting_date"],
-    "amount", ["common", "amount"]
+    "applicant_last_name", ["common", "applicant_last_name"]
 ]

@@ -55,9 +55,6 @@ def merge_csv_as_data_source(definition: PipelineDefinition,
 
     Raises
     ------
-    NotImplementedError
-        - 自動フォーム検出が有効な場合、同名のデータソースが複数生成される可能性がある
-          その対策がまだ実装されていないためエラーを出す
     """
     copied = deepcopy(definition)
 
@@ -65,15 +62,10 @@ def merge_csv_as_data_source(definition: PipelineDefinition,
     sources = extract_data_source(settings)
 
     # データソースをマージ
-    source_names = []
     for source in sources:
-        if ((source.name in source_names) and
-            settings.csv_import_settings.enable_auto_form_detection):
-            # 自動フォーム検出を有効にした場合、同名のデータソースが複数生成されうる
-            # その対策をまだ考えていないため、エラーを出す
-            raise NotImplementedError("Auto form detection is not supported yet")
-        copied.data_link.add_source(source)
-        source_names.append(source.name)
+        if not copied.data_link.add_source(source):
+            # 同名のデータソースが複数存在する場合はエラー
+            raise ValueError(f"Duplicate data source name: '{source.name}' (from CSV files)")
 
     return copied
 
@@ -123,6 +115,7 @@ def extract_data_source(settings: CsvToJsonSettings) -> list[RawDataSource]:
                 "", data = [p.to_dict() for p in parsed]
             ))
             unnamed_count += 1
+            print(source_name, form_name)#, "  ---  ", list(parsed[0].titles["common"].values()))
 
     return sources
 

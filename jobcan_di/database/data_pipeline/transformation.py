@@ -137,9 +137,10 @@ can be performed efficiently.
 from collections.abc import Sequence, Mapping
 from copy import deepcopy
 from enum import Flag, auto
+import re
 from typing import Any, Union, Optional
 
-from ._insertion_profile import ParameterConversionMethod
+from ._insertion_profile import ParameterConversionMethod, Source
 
 
 
@@ -417,9 +418,40 @@ def get_indices(data:Sequence[Any], value:Any) -> list[int]:
 # Transformation (JSON->JSON conversion)
 #
 
+def _find_source_names(sources: list[Source],
+                       source_names: list[str]) -> list[str]:
+    """Find the source names in the given sources
+
+    Parameters
+    ----------
+    sources : list[Source]
+        List of sources to search in
+    source_names : list[str]
+        List of source names to find
+
+    Returns
+    -------
+    list[str]
+        List of source names found in the sources
+    """
+    ret : list[str] = []
+
+    for source in sources:
+        if not source.regex:
+            # If the source name is not a regex, add it to the list
+            if source.name in source_names:
+                ret.append(source.name)
+        else:
+            # If the source name is a regex, check if it matches any of the source names
+            for source_name in source_names:
+                if re.match(source.name, source_name):
+                    ret.append(source_name)
+
+    return ret
+
 def transform_named_data(
         extracted: Mapping[str, Sequence[dict]],
-        source_name: str,
+        sources: list[Source],
         profile: Mapping[str, Sequence[Union[str, int]]], *,
         conversion_method: Optional[Mapping[str, ParameterConversionMethod]] = None
     ) -> list[dict[str, Any]]:
@@ -430,8 +462,8 @@ def transform_named_data(
     ----------
     extracted : dict[str, list[dict]]
         Dictionary containing the source data
-    source_name : str
-        Name of the source to be processed
+    sources : list[Source]
+        List of sources to be processed
     profile : dict[str, list[Union[str, int]]]
         Dictionary defining the transformation rules
     conversion_method : dict[str, ParameterConversionMethod], optional
@@ -446,9 +478,9 @@ def transform_named_data(
     -----
     - This code is optimized for `recursive_get` with `DEFAULT_ERROR_HANDLING`
     """
-    if source_name not in extracted:
-        return []
-    source = extracted[source_name]
+    source = []
+    for source_name in _find_source_names(sources, list(extracted.keys())):
+        source.extend(extracted[source_name])
 
     transformed = _transform_source(source, profile)
 
@@ -460,7 +492,7 @@ def transform_named_data(
 
 def transform_positional_data(
         extracted: Mapping[str, Sequence[dict]],
-        source_name: str,
+        sources: list[Source],
         profile: Sequence[Sequence[Union[str, int]]], *,
         conversion_method: Optional[Mapping[str, ParameterConversionMethod]] = None
     ) -> list[tuple[Any, ...]]:
@@ -471,8 +503,8 @@ def transform_positional_data(
     ----------
     extracted : dict[str, list[dict]]
         Dictionary containing the source data
-    source_name : str
-        Name of the source to be processed
+    sources : list[Source]
+        List of sources to be processed
     profile : list[list[Union[str, int]]]
         List defining the transformation rules
     conversion_method : dict[Union[int, str], ParameterConversionMethod], optional
@@ -488,9 +520,9 @@ def transform_positional_data(
     -----
     - This code is optimized for `recursive_get` with `DEFAULT_ERROR_HANDLING`
     """
-    if source_name not in extracted:
-        return []
-    source = extracted[source_name]
+    source = []
+    for source_name in _find_source_names(sources, list(extracted.keys())):
+        source.extend(extracted[source_name])
 
     # Convert the profile to a dictionary with indexes as string keys
     profile_dict = {str(i): p for i, p in enumerate(profile)}

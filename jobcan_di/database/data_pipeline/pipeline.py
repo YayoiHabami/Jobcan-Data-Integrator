@@ -161,7 +161,7 @@ def _transform_and_load_data(
     if isinstance(profile, NamedInsertionProfile):
         # Transform data for the `table_name` table
         transformed = transform_named_data(
-            extracted, profile.source, profile.named_parameters(),
+            extracted, profile.sources, profile.named_parameters(),
             conversion_method=profile.conversion_methods()
         )
 
@@ -170,7 +170,7 @@ def _transform_and_load_data(
     elif isinstance(profile, PositionalInsertionProfile):
         # Transform data for the `table_name` table
         transformed = transform_positional_data(
-            extracted, profile.source, profile.positional_parameters(),
+            extracted, profile.sources, profile.positional_parameters(),
             conversion_method=profile.conversion_methods()
         )
 

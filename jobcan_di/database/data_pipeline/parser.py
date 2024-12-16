@@ -75,7 +75,7 @@ from ._db_definition import DBDefinition, SQLiteDBDefinition
 from ._insertion_profile import (
     InsertionProfile,
     PositionalInsertionProfile, NamedInsertionProfile,
-    ParameterConversionMethod
+    ParameterConversionMethod, Source
 )
 from ._pipeline_definition import PipelineDefinition, DataLink
 
@@ -455,12 +455,26 @@ def _parse_insertion_profiles(profile:toml_items.Table) -> dict[str, InsertionPr
                              f"for table '{table_name}'")
         query = _query.unwrap()
 
-        #
-        _source = profile.get("source")
-        if (_source is None) or (not isinstance(_source, toml_items.String)):
-            raise ValueError("Source not found or is not a string in the insertion profile " \
+        # Get the source(s)
+        sources : list[Source] = []
+        for s, regex in [("source", False), ("regex_source", True)]:
+            _source = profile.get(s)
+            if _source is None:
+                continue
+            if isinstance(_source, toml_items.String):
+                sources.append(Source(name=_source.unwrap(), regex=regex))
+            elif isinstance(_source, toml_items.Array):
+                for i, s in enumerate(_source):
+                    if not isinstance(s, toml_items.String):
+                        raise ValueError(f"The {i}-th {s} is not a string " \
+                                        f"in the insertion profile for table '{table_name}'")
+                    sources.append(Source(name=s.unwrap(), regex=regex))
+            else:
+                raise ValueError(f"{s} is not a string or an array of strings " \
+                                f"in the insertion profile for table '{table_name}'")
+        if len(sources) == 0:
+            raise ValueError("Source not found in the insertion profile " \
                              f"for table '{table_name}'")
-        source = _source.unwrap()
 
         # Determine whether Positional or Named Parameter is used
         is_positional = "positional_parameters" in profile
@@ -475,11 +489,11 @@ def _parse_insertion_profiles(profile:toml_items.Table) -> dict[str, InsertionPr
         # Parse the insertion profile
         if is_positional:
             insertion_profiles[table_name] = _parse_positional_insertion_profile(
-                profile, query, source, table_name
+                profile, query, sources, table_name
             )
         else:
             insertion_profiles[table_name] = _parse_named_insertion_profile(
-                profile, query, source, table_name
+                profile, query, sources, table_name
             )
 
     return insertion_profiles
@@ -487,7 +501,7 @@ def _parse_insertion_profiles(profile:toml_items.Table) -> dict[str, InsertionPr
 def _parse_positional_insertion_profile(
         profile:toml_items.Table,
         query:str,
-        source:str,
+        sources:list[Source],
         table_name:str
     ) -> PositionalInsertionProfile:
     """Parse a positional insertion profile in the TOML data
@@ -498,7 +512,7 @@ def _parse_positional_insertion_profile(
         Positional insertion profile
     query : str
         SQL query to insert data into the table
-    source : str
+    sources : list[Source]
         Source of the data
     table_name : str
         Name of the table
@@ -548,14 +562,14 @@ def _parse_positional_insertion_profile(
             conversion_method[str(index)] = ParameterConversionMethod[m_str]
 
     return PositionalInsertionProfile(
-        query, source=source,
+        query, sources=sources,
         parameters=parameters, conversion_method=conversion_method
     )
 
 def _parse_named_insertion_profile(
         profile:toml_items.Table,
         query:str,
-        source:str,
+        sources:list[Source],
         table_name:str
     ) -> NamedInsertionProfile:
     """Parse a named insertion profile in the TOML data
@@ -566,7 +580,7 @@ def _parse_named_insertion_profile(
         Named insertion profile
     query : str
         SQL query to insert data into the table
-    source : str
+    sources : list[Source]
         Source of the data
     table_name : str
         Name of the table
@@ -621,6 +635,6 @@ def _parse_named_insertion_profile(
             conversion_method[key.unwrap()] = ParameterConversionMethod[m_str]
 
     return NamedInsertionProfile(
-        query, source=source,
+        query, sources=sources,
         parameters=parameters, conversion_method=conversion_method
     )
